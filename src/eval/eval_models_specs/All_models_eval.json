@@ -1,0 +1,14 @@
+{
+    "dataframe": "sevir",
+    "fold": "val",
+    "models": {
+        "unet": {
+            "model":"unet/a53bf900f29a4fe2214e6895d72ceef2",
+            "file": "metrics_0--best-epoch=19_val.csv"
+        },
+        "evolution_network":{
+            "model":"evolution_network/4212f2e50d2aacf2b38576a384a9fce3",
+            "file": "metrics_0--best-epoch=121_val.csv"
+        }
+    }
+}
