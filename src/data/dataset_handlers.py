@@ -28,10 +28,10 @@ class DatasetHandler(ABC):
         self,
         locations: List[str],
         data_shape: Tuple[int, ...] = (256, 256),
-        base_paths: List[str] = ["/home/impa-cast/", "/var/crash/impa-cast", ""],
+        base_paths: List[str] = [""],
         split: Optional[str] = None,
     ):
-        self.base_paths = base_paths if base_paths else ["/home/impa-cast/", "/var/crash/impa-cast", ""]
+        self.base_paths = base_paths if base_paths else [""]
         self.locations = locations
         self.data_shape = data_shape
         self.split = split
@@ -42,7 +42,8 @@ class DatasetHandler(ABC):
         # Add file handler
         file_handler = logging.FileHandler("dataset_handler.log")
         file_handler.setLevel(logging.DEBUG)
-        formatter = logging.Formatter("%(asctime)s %(name)s %(levelname)s: %(message)s")
+        formatter = logging.Formatter(
+            "%(asctime)s %(name)s %(levelname)s: %(message)s")
         file_handler.setFormatter(formatter)
         if not self.logger.hasHandlers():
             self.logger.addHandler(file_handler)
@@ -95,7 +96,7 @@ class GOES16Handler(DatasetHandler):
         **kwargs,
     ):
         self.locations_dict = {
-            "rj": "SAT-ABI-L2-RRQPEF-rj.hdf",
+            "rio_de_janeiro": "SAT-ABI-L2-RRQPEF-rio_de_janeiro.hdf",
             "la_paz": "SAT-ABI-L2-RRQPEF-la_paz.hdf",
             "manaus": "SAT-ABI-L2-RRQPEF-manaus.hdf",
             "toronto": "SAT-ABI-L2-RRQPEF-toronto.hdf",
@@ -118,11 +119,12 @@ class GOES16Handler(DatasetHandler):
                 for dt in datetimes:
                     key = dt.strftime("%Y%m%d/%H%M")
                     if key in f:
-                        data = f[key][:, :, 0]
+                        data = f[key]
                         results.append(data)
                     else:
                         self.logger.debug(f"Missing GOES-16 data for {key}")
-                        results.append(np.zeros(self.data_shape, dtype=np.float32))
+                        results.append(
+                            np.zeros(self.data_shape, dtype=np.float32))
 
             return np.stack(results)
 
@@ -151,7 +153,7 @@ class IMERGHandler(DatasetHandler):
         **kwargs,
     ):
         self.locations_dict = {
-            "rj": "final_cropped-lat=-35.7:-10.1,lon=-56.0:-30.4",
+            "rio_de_janeiro": "final_cropped-lat=-35.7:-10.1,lon=-56.0:-30.4",
             "manaus": "final_cropped-lat=-15.9:9.7,lon=-72.8:-47.2",
             "la_paz": "final_cropped-lat=-29.3:-3.7,lon=-80.9:-55.3",
             "miami": "final_cropped-lat=13.0:38.6,lon=-93.0:-67.4",
@@ -185,7 +187,8 @@ class IMERGHandler(DatasetHandler):
         dt_minute = shifted_dt.minute // 30
         dir = f"data/imerg/{self.locations_dict[location]}/"
         file_name = (
-            shifted_dt.strftime("%Y%m%d") + f"-S{shifted_dt.hour:02d}{dt_minute * 30:02d}00-"
+            shifted_dt.strftime(
+                "%Y%m%d") + f"-S{shifted_dt.hour:02d}{dt_minute * 30:02d}00-"
             f"E{shifted_dt.hour:02d}{dt_minute * 30 + 29:02d}59.nc"
         )
         return self._find_valid_path(dir + file_name)
@@ -228,7 +231,8 @@ class PredictionsHandler(DatasetHandler):
             self.model, self.original_data, self.hash_val = list_data[:3]
             self.ckpt_file = list_data[3] if len(list_data) == 4 else None
         else:
-            raise ValueError("Unexpected dataset format. Expected format: model#original_data#hash_val[#ckpt_file]")
+            raise ValueError(
+                "Unexpected dataset format. Expected format: model#original_data#hash_val[#ckpt_file]")
         # Get model name
         model_name_map = {
             "evonet": "evolution_network",
@@ -247,7 +251,8 @@ class PredictionsHandler(DatasetHandler):
     ) -> np.ndarray:
         """Fetch predictions data from HDF5 files."""
         if not split or not curr_dt:
-            self.logger.error("Missing required parameters for predictions fetch")
+            self.logger.error(
+                "Missing required parameters for predictions fetch")
             return self._get_fallback_data(datetimes)
 
         try:
@@ -282,21 +287,27 @@ class PredictionsHandler(DatasetHandler):
                         else:
                             print("Getting fallback data for key:", key)
                             self.logger.debug(f"Key {key} not found")
-                            results.append(np.zeros(self.data_shape, dtype=np.float32))
+                            results.append(
+                                np.zeros(self.data_shape, dtype=np.float32))
 
                 elif self.model == "autoencoderklgan":
-                    keys = [f"{dt.strftime('%Y-%m-%d %H:%M:%S')}" for dt in datetimes]
-                    same_need_keys = [f"{dt.strftime('%Y%m%d-%H%M')}" for dt in datetimes]
+                    keys = [
+                        f"{dt.strftime('%Y-%m-%d %H:%M:%S')}" for dt in datetimes]
+                    same_need_keys = [
+                        f"{dt.strftime('%Y%m%d-%H%M')}" for dt in datetimes]
                     for key, n_key in zip(keys, same_need_keys):
                         try:
                             results.append(np.array(hdf[key][n_key]))
                         except KeyError:
                             print("Getting fallback data for key:", key, n_key)
                             self.logger.debug(f"Key {key}/{n_key} not found")
-                            results.append(np.zeros(self.data_shape, dtype=np.float32))
+                            results.append(
+                                np.zeros(self.data_shape, dtype=np.float32))
                 elif self.model == "nowcastrio_autoenc":
-                    keys = [f"{dt.strftime('%Y-%m-%d %H:%M:%S')}" for dt in datetimes]
-                    same_need_keys = [f"{dt.strftime('%Y%m%d-%H%M')}" for dt in datetimes]
+                    keys = [
+                        f"{dt.strftime('%Y-%m-%d %H:%M:%S')}" for dt in datetimes]
+                    same_need_keys = [
+                        f"{dt.strftime('%Y%m%d-%H%M')}" for dt in datetimes]
                     for key, n_key in zip(keys, same_need_keys):
                         try:
                             results.append(np.array(hdf[key][n_key]))
@@ -304,7 +315,8 @@ class PredictionsHandler(DatasetHandler):
                         except KeyError:
                             print("Getting fallback data for key:", key, n_key)
                             self.logger.debug(f"Key {key}/{n_key} not found")
-                            results.append(np.zeros(self.data_shape, dtype=np.float32))
+                            results.append(
+                                np.zeros(self.data_shape, dtype=np.float32))
 
             return np.stack(results)
 
@@ -342,7 +354,8 @@ class FieldsIntensitiesHandler(DatasetHandler):
             dataset_path = self._find_valid_path(file_path)
 
             if not dataset_path:
-                self.logger.warning(f"Fields intensities file not found: {file_path}")
+                self.logger.warning(
+                    f"Fields intensities file not found: {file_path}")
                 return self._get_fallback_data(datetimes)
 
             results = []
@@ -359,11 +372,13 @@ class FieldsIntensitiesHandler(DatasetHandler):
                         fields = hdf["motion_fields"][key]
 
                         # Concatenate along first axis
-                        full_tensor = np.concatenate((fields, intensities), axis=0)
+                        full_tensor = np.concatenate(
+                            (fields, intensities), axis=0)
                         results.append(full_tensor)
 
                     except KeyError:
-                        self.logger.debug(f"Key {key} not found for {location}")
+                        self.logger.debug(
+                            f"Key {key} not found for {location}")
                         # Create fallback: 2 motion fields + 1 intensity field
                         arr = np.zeros(self.data_shape, dtype=np.float32)
                         results.append(arr)
