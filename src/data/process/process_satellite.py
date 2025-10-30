@@ -1,5 +1,7 @@
+import gc
+import yaml
 from argparse import ArgumentParser
-from datetime import datetime, timedelta
+import datetime
 from glob import glob
 from pathlib import Path
 
@@ -11,17 +13,23 @@ from pyproj import Proj
 from tqdm import tqdm
 
 locations_dict = {
+    "rio_de_janeiro": {
+        "lat_min": -26.0,
+        "lat_max": -19.0,
+        "lon_min": -47.0,
+        "lon_max": -40.0
+    },
     "la_paz": {
-        "lat_min": -21.5,
-        "lat_max": -11.5,
-        "lon_min": -73.0,
-        "lon_max": -63.0,
+        "lat_min": -20.5,
+        "lat_max": -12.5,
+        "lon_min": -72.0,
+        "lon_max": -64.0,
     },
     "manaus": {
-        "lat_min": -8.0,
-        "lat_max": 2.0,
-        "lon_min": -65.0,
-        "lon_max": -55.0,
+        "lat_min": -7.0,
+        "lat_max": 1.0,
+        "lon_min": -64.0,
+        "lon_max": -56.0,
     },
     "toronto": {
         "lat_min": 39.06,
@@ -38,7 +46,7 @@ locations_dict = {
 }
 
 
-def process_satellite(
+def process_file(
     file_path: str,
     bands: list[str],
     lat_bounds: tuple[float, float] | None = None,
@@ -63,9 +71,8 @@ def process_satellite(
     dataset = xr.open_dataset(file_path)
 
     # Retrieve datetimes of file creation and start and end of scan (UTC)
-    scan_start = datetime.strptime(dataset.time_coverage_start, "%Y-%m-%dT%H:%M:%S.%fZ")
-    scan_end = datetime.strptime(dataset.time_coverage_end, "%Y-%m-%dT%H:%M:%S.%fZ")
-    creation = datetime.strptime(dataset.date_created, "%Y-%m-%dT%H:%M:%S.%fZ")
+    creation = datetime.datetime.strptime(
+        dataset.date_created, "%Y-%m-%dT%H:%M:%S.%fZ")
 
     if hasattr(dataset, "lon") and hasattr(dataset, "lat"):
         lons, lats = dataset["lon"], dataset["lat"]
@@ -93,58 +100,40 @@ def process_satellite(
 
     # Construct dataframe
     df = pd.DataFrame(
-        np.array(data).reshape(len(data), -1).T,
+        np.array(data).astype(dtype=np.float32).reshape(len(data), -1).T,
         columns=["lat", "lon", *bands],
     )
 
     # Remove nan and infinite values
-    df = df.replace(np.inf, np.nan)
-    df = df.dropna(how="any", axis=0)
+    df.replace(np.inf, np.nan, inplace=True)
+    df.dropna(how="any", axis=0, inplace=True)
 
     # Discard observations for latitudes and longitudes outside bounds
     if lat_bounds:
-        df = df[(df["lat"] > lat_bounds[0]) & (df["lat"] < lat_bounds[1])]
+        df.drop(df[(df["lat"] <= lat_bounds[0]) | (
+            df["lat"] >= lat_bounds[1])].index, inplace=True)
     if lon_bounds:
-        df = df[(df["lon"] > lon_bounds[0]) & (df["lon"] < lon_bounds[1])]
+        df.drop(df[(df["lon"] <= lon_bounds[0]) | (
+            df["lon"] >= lon_bounds[1])].index, inplace=True)
 
-    # Include datetimes of file creation and start and end of scan (UTC)
-    df["start"] = scan_start  # - timedelta(hours=3)
-    df["end"] = scan_end  # - timedelta(hours=3)
+    # Include datetimes of file creation and start and end of scan (UTC-3)
     df["creation"] = creation  # - timedelta(hours=3)
 
     if include_dataset_name:
         df["name"] = "_".join(dataset.dataset_name.split("_")[:2])
-
+    gc.collect()
     return df
 
 
-if __name__ == "__main__":
-    parser = ArgumentParser()
-    parser.add_argument("--product", type=str, default="ABI-L2-RRQPEF")
-    parser.add_argument("--lat_min", type=float, default=-26.0)
-    parser.add_argument("--lat_max", type=float, default=-19.0)
-    parser.add_argument("--lon_min", type=float, default=-47.0)
-    parser.add_argument("--lon_max", type=float, default=-40.0)
-    parser.add_argument("--location", type=str, default="manaus")
-    parser.add_argument("--n_jobs", type=int, default=-1)
-    args = parser.parse_args()
+def process_satellite(
+    rain_events_file=None, product="ABI-L2-RRQPEF", location="rio_de_janeiro", num_workers=16
+):
+    # open yaml file with rain events information
+    rain_events_name = Path(rain_events_file).stem
+    with open(rain_events_file, "r") as file:
+        rain_events_list = yaml.safe_load(file)
 
-    if args.location in locations_dict:
-        lat_bounds = (
-            locations_dict[args.location]["lat_min"],
-            locations_dict[args.location]["lat_max"],
-        )
-        lon_bounds = (
-            locations_dict[args.location]["lon_min"],
-            locations_dict[args.location]["lon_max"],
-        )
-        output_path = Path(f"data/processed/satellite/{args.location}/{args.product}")
-    else:
-        lat_bounds = args.lat_min, args.lat_max
-        lon_bounds = args.lon_min, args.lon_max
-        output_path = Path(f"data/processed/satellite/{args.product}")
-
-    match args.product:
+    match product:
         case "ABI-L2-MCMIPF":  # Cloud and Moisture Imagery
             bands = ["CMI_C08", "CMI_C09", "CMI_C10", "CMI_C11"]
             include_dataset_name = False
@@ -163,45 +152,46 @@ if __name__ == "__main__":
         case "ABI-L2-ACHAF":
             bands = ["HT"]
             include_dataset_name = False
-        case "ABI-L2-LSTF":
-            bands = ["LST", "DQF", "PQI"]
-            include_dataset_name = False
         case _:
             raise ValueError("Unsupported product selected.")
 
-    def load_entire_day(ts: pd.Timestamp) -> pd.DataFrame:
-        year = ts.year
-        day = ts.dayofyear
-        return pd.concat(
-            Parallel(n_jobs=args.n_jobs)(
-                delayed(process_satellite)(file, bands, lat_bounds, lon_bounds, include_dataset_name)
-                for file in tqdm(glob(f"data/raw/satellite/{args.product}/{year}/{day:03d}/*/*.nc"))
+    lat_min = locations_dict[location]["lat_min"]
+    lat_max = locations_dict[location]["lat_max"]
+    lon_min = locations_dict[location]["lon_min"]
+    lon_max = locations_dict[location]["lon_max"]
+
+    lat_bounds = lat_min, lat_max
+    lon_bounds = lon_min, lon_max
+
+    for i, event_dict in enumerate(rain_events_list):
+        start = pd.to_datetime(event_dict["start"])
+        end = pd.to_datetime(event_dict["end"])+datetime.timedelta(hours=1)
+        files = set()
+        for dt in pd.date_range(start, end, freq="1h"):
+            year = dt.year
+            day = dt.timetuple().tm_yday
+            hour = dt.hour
+            files = files.union(
+                glob(f"data/raw/satellite/{product}/{year}/{day:03d}/{hour:02d}/*.nc"))
+        files = list(files)
+        dataframe = pd.concat(
+            Parallel(n_jobs=num_workers)(
+                delayed(process_file)(file, bands, lat_bounds, lon_bounds, include_dataset_name) for file in tqdm(files)
             )
         )
+        dataframe.reset_index(drop=True, inplace=True)
+        output_path = Path(f"data/processed/satellite/{product}/{location}")
+        output_path.mkdir(exist_ok=True, parents=True)
+        dataframe.to_feather(
+            f"{output_path}/event_id={i:04d}.feather")
 
-    start_date = datetime(2020, 1, 1)
-    end_date = datetime(2025, 1, 1)
 
-    df_current = load_entire_day(pd.Timestamp(start_date))
+if __name__ == "__main__":
+    parser = ArgumentParser()
+    parser.add_argument("rain_events_file", type=str)
+    parser.add_argument("--product", type=str, default="ABI-L2-RRQPEF")
+    parser.add_argument("--location", type=str, default="rio_de_janeiro")
+    parser.add_argument("--num_workers", type=int, default=16)
+    args = parser.parse_args()
 
-    output_path.mkdir(exist_ok=True, parents=True)
-
-    for date in tqdm(
-        pd.date_range(start_date, end_date),
-        desc="Saving files",
-    ):
-        output_file = f"{output_path}/{date.date()}.feather"
-        output_file = Path(output_file)
-        if output_file.exists():
-            print(f"File {output_file} already exists. Skipping.")
-            continue
-        next_date = date + timedelta(days=1)
-        df_next = load_entire_day(next_date)
-
-        df = pd.concat([df_current, df_next])
-        df = df[df["creation"].dt.date == date.date()]
-        df = df.reset_index(drop=True)
-        df.to_feather(output_file)
-
-        df_current = df_next.copy()
-        del df_next
+    process_satellite(**vars(args))
