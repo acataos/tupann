@@ -37,7 +37,8 @@ def compute_motion_field(Xt, method="lk"):
     metadata["unit"] = "mm/h"
     motion_field = np.zeros((2, Xt.shape[-1], Xt.shape[-1]))
     Xt = Xt.cpu().numpy()[:, :]
-    train_precip_pre = conversion.to_rainrate(Xt, metadata, zr_a=a_z, zr_b=b_z)[0]
+    train_precip_pre = conversion.to_rainrate(
+        Xt, metadata, zr_a=a_z, zr_b=b_z)[0]
     train_precip = transformation.dB_transform(train_precip_pre, metadata)[0]
     train_precip[~np.isfinite(train_precip)] = zero
 
@@ -76,11 +77,16 @@ def warp(input, flow, grid, mode="bilinear", padding_mode="zeros", fill_value=0.
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Save motion fields and intensities for a dataset and datetimes.")
-    parser.add_argument("--dataset", type=str, required=True, help="Dataset name")
-    parser.add_argument("--datetimes_file", type=str, required=True, help="List of datetimes")
-    parser.add_argument("--locations", nargs="+", help="Locations to process", default=["rj"])
-    parser.add_argument("--overwrite", "-o", action="store_true", help="Overwrite existing files")
+    parser = argparse.ArgumentParser(
+        description="Save motion fields and intensities for a dataset and datetimes.")
+    parser.add_argument("--dataset", type=str,
+                        required=True, help="Dataset name")
+    parser.add_argument("--datetimes_file", type=str,
+                        required=True, help="List of datetimes")
+    parser.add_argument("--locations", nargs="+",
+                        help="Locations to process", default=["rio_de_janeiro"])
+    parser.add_argument("--overwrite", "-o",
+                        action="store_true", help="Overwrite existing files")
     args = parser.parse_args()
 
     sample_tensor = torch.zeros(1, 1, 256, 256)
@@ -89,36 +95,44 @@ def main():
     datetimes_file = args.datetimes_file
     # read datetimes from file
     with open(datetimes_file, "r") as f:
-        datetimes = [datetime.datetime.strptime(line.strip(), DT_FORMAT) for line in f.readlines()]
+        datetimes = [datetime.datetime.strptime(
+            line.strip(), DT_FORMAT) for line in f.readlines()]
 
-    dataset_handler = DatasetHandlerFactory.create_handler(dataset, args.locations)
+    dataset_handler = DatasetHandlerFactory.create_handler(
+        dataset, args.locations)
     for motion_field_method in motion_field_methods:
         for location in args.locations:
             fields_intensities_hdf_file = pathlib.Path(
-                f"data/fields_intensities_rain_events/{motion_field_method}/{args.dataset}_{location}.hdf"
+                f"data/fields_intensities/{motion_field_method}/{args.dataset}_{location}.hdf"
             )
-            fields_intensities_hdf_file.parent.mkdir(parents=True, exist_ok=True)
+            fields_intensities_hdf_file.parent.mkdir(
+                parents=True, exist_ok=True)
             # check if file exists
             with h5py.File(fields_intensities_hdf_file, "a") as hdf:
                 min_val = 0
                 for dt in tqdm(datetimes):
                     dts = []
                     try:
-                        _ = np.array(hdf[f"motion_fields/{dt.strftime('%Y%m%d/%H%M')}"])
-                        _ = np.array(hdf[f"intensities/{dt.strftime('%Y%m%d/%H%M')}"])
+                        _ = np.array(
+                            hdf[f"motion_fields/{dt.strftime('%Y%m%d/%H%M')}"])
+                        _ = np.array(
+                            hdf[f"intensities/{dt.strftime('%Y%m%d/%H%M')}"])
                         continue
                     except KeyError:
                         pass
                     for i in range(-CONTEXT_DICT[motion_field_method] + 1, 2):
-                        dts.append(dt + datetime.timedelta(minutes=i * dataset_dict[dataset]["timestep"]))
+                        dts.append(dt + datetime.timedelta(minutes=i *
+                                   dataset_dict[dataset]["timestep"]))
                     tensor = torch.tensor(dataset_handler.fetch(dts, location))
                     print(tensor.max())
                     tensor = torch.nan_to_num(tensor)
                     tensor = tensor.float()
                     # compute motion field
-                    motion_field = np.array(compute_motion_field(tensor, motion_field_method)).astype(np.float32)
+                    motion_field = np.array(compute_motion_field(
+                        tensor, motion_field_method)).astype(np.float32)
                     # compute intensities
-                    cuda_motion_field = torch.tensor(motion_field).float().unsqueeze(0).cuda()
+                    cuda_motion_field = torch.tensor(
+                        motion_field).float().unsqueeze(0).cuda()
                     X0 = tensor[-2].unsqueeze(0).unsqueeze(0).cuda()
                     X1 = tensor[-1].cuda()
                     pred_image = warp(
