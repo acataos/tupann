@@ -10,8 +10,6 @@ import numpy as np
 import torch
 import torch.distributed as dist
 
-# from megatron_utils import mpu
-
 
 class SmoothedValue(object):
     """Track a series of values and provide access to smoothed values over a
@@ -20,31 +18,14 @@ class SmoothedValue(object):
 
     def __init__(self, window_size=100, fmt=None, sync=True):
         if fmt is None:
-            fmt = "{median:.4f} ({global_avg:.4f}, {value:.4f})"  # fmt = "{median:.10f} ({global_avg:.10f})"
+            # fmt = "{median:.10f} ({global_avg:.10f})"
+            fmt = "{median:.4f} ({global_avg:.4f}, {value:.4f})"
         self.deque = deque(maxlen=window_size)
         self.total = 0.0
         self.count = 0
         self.var = 0.0
         self.fmt = fmt
         self.sync = sync
-
-    ####### 3 sigma skip ############
-    # def update(self, value, n=1):
-    #     """
-    #     skip value beyond 3sigma
-    #     """
-    #     prev_mean = self.total / (self.count + 1e-12)
-    #     if self.var==0 or (value - prev_mean) < 3 * self.var**0.5:
-    #         self.deque.append(value)
-    #         self.count += n
-    #         self.total += value * n
-    #         cur_mean = self.total / (self.count + 1e-12)
-    #         self.var = (self.count - 1)/self.count * self.var + (value - prev_mean) * (value - cur_mean) / (self.count + 1e-12)
-    #     else:
-    #         ## if beyond 3sigma, only update var
-    #         self.deque.append(value)
-    #         cur_mean = (self.total + n*value) / (n + self.count + 1e-12)
-    #         self.var = self.count/(self.count + 1) * self.var + (value - prev_mean) * (value - cur_mean) / (self.count - 1 + 1e-12)
 
     def update(self, value, n=1):
         self.deque.append(value)
@@ -57,7 +38,8 @@ class SmoothedValue(object):
         """
         if (not is_dist_avail_and_initialized()) or (not self.sync):
             return
-        t = torch.tensor([self.count, self.total, self.var], dtype=torch.float64, device="cuda")
+        t = torch.tensor([self.count, self.total, self.var],
+                         dtype=torch.float64, device="cuda")
         dist.barrier()
         dist.all_reduce(t)
         t = t / get_world_size()
@@ -95,17 +77,13 @@ class SmoothedValue(object):
         max = self.max
         value = self.value
         if is_dist_avail_and_initialized() and self.sync:
-            t = torch.tensor([median, avg, max, value], dtype=torch.float64, device="cuda")
+            t = torch.tensor([median, avg, max, value],
+                             dtype=torch.float64, device="cuda")
             dist.barrier()
             dist.all_reduce(t)
             t = t / get_world_size()
             t = t.tolist()
             median, avg, max, value = t
-        # else:
-        #     median      = self.median
-        #     avg         = self.avg
-        #     max         = self.max
-        #     value       = self.value
 
         return self.fmt.format(median=median, avg=avg, global_avg=self.global_avg, max=max, value=value)
 
@@ -128,7 +106,8 @@ class MetricLogger(object):
             return self.meters[attr]
         if attr in self.__dict__:
             return self.__dict__[attr]
-        raise AttributeError("'{}' object has no attribute '{}'".format(type(self).__name__, attr))
+        raise AttributeError(
+            "'{}' object has no attribute '{}'".format(type(self).__name__, attr))
 
     def __str__(self):
         loss_str = []
@@ -166,7 +145,8 @@ class MetricLogger(object):
             )
         else:
             log_msg = self.delimiter.join(
-                [header, "[{0" + space_fmt + "}/{1}]", "eta: {eta}", "{meters}", "time: {time}", "data: {data}"]
+                [header, "[{0" + space_fmt + "}/{1}]", "eta: {eta}",
+                    "{meters}", "time: {time}", "data: {data}"]
             )
         MB = 1024.0 * 1024.0
         for obj in iterable:
@@ -198,7 +178,8 @@ class MetricLogger(object):
             end = time.time()
         total_time = time.time() - start_time
         total_time_str = str(datetime.timedelta(seconds=int(total_time)))
-        print("{} Total time: {} ({:.4f} s / it)".format(header, total_time_str, total_time / len(iterable)))
+        print("{} Total time: {} ({:.4f} s / it)".format(header,
+              total_time_str, total_time / len(iterable)))
 
 
 def reduce_dict(input_dict, average=True):
@@ -273,31 +254,6 @@ def save_on_master(*args, **kwargs):
         torch.save(*args, **kwargs)
 
 
-# def init_distributed_mode(args):
-#     if 'RANK' in os.environ and 'WORLD_SIZE' in os.environ:
-#         args.rank = int(os.environ["RANK"])
-#         args.world_size = int(os.environ['WORLD_SIZE'])
-#         args.local_rank = int(os.environ['LOCAL_RANK'])
-#     elif 'SLURM_PROCID' in os.environ:
-#         args.rank = int(os.environ['SLURM_PROCID'])
-#         args.local_rank = args.rank % torch.cuda.device_count()
-#     else:
-#         print('Not using distributed mode')
-#         args.distributed = False
-#         return
-
-#     args.distributed = True
-
-#     torch.cuda.set_device(args.local_rank)
-#     args.dist_backend = 'nccl'
-#     print('| distributed init (rank {}): {}'.format(
-#         args.rank, args.init_method), flush=True)
-#     torch.distributed.init_process_group(backend=args.dist_backend, init_method=args.init_method,
-#                                          world_size=args.world_size, rank=args.rank)
-#     torch.distributed.barrier()
-#     setup_for_distributed(args.rank == 0)
-
-
 def get_ip(ip_list):
     if "," in ip_list:
         ip_list = ip_list.split(",")[0]
@@ -309,81 +265,6 @@ def get_ip(ip_list):
         ip1, ip2, ip3, ip4 = ip_list.split("-")[-4:]
     ip_addr = "tcp://" + ".".join([ip1, ip2, ip3, ip4]) + ":"
     return ip_addr
-
-
-# def init_distributed_mode(args):
-#     if "RANK" in os.environ and "WORLD_SIZE" in os.environ:
-#         args.rank = int(os.environ["RANK"])
-#         args.world_size = int(os.environ["WORLD_SIZE"])
-#         args.local_rank = int(os.environ["LOCAL_RANK"])
-#     elif "SLURM_PROCID" in os.environ:
-#         args.rank = int(os.environ["SLURM_PROCID"])
-#         args.local_rank = int(os.environ["SLURM_LOCALID"])
-#         args.world_size = int(os.environ["SLURM_NTASKS"])
-#         ip_addr = get_ip(os.environ["SLURM_STEP_NODELIST"])
-#         # port = int(os.environ["SLURM_SRUN_COMM_PORT"])
-#         # args.init_method = ip_addr + str(port)
-#         args.init_method = ip_addr + args.init_method.split(":")[-1]
-#     else:
-#         print("Not using distributed mode")
-#         args.distributed = False
-#         return
-
-#     args.distributed = True
-
-#     # addr = subprocess.getoutput(
-#     #         "scontrol show hostname {} | head -n1".format(os.environ["SLURM_NODELIST"])
-#     #     )
-#     # os.environ["MASTER_PORT"] = args.init_method.split(":")[-1]
-#     # os.environ["MASTER_ADDR"] = addr
-#     # os.environ["WORLD_SIZE"] = str(args.world_size)
-#     # os.environ["RANK"] = str(args.rank)
-
-#     torch.cuda.set_device(args.local_rank)
-#     args.dist_backend = "nccl"
-#     print(
-#         "| distributed init (rank {}, local_rank {}): {}".format(args.rank, args.local_rank, args.init_method),
-#         flush=True,
-#     )
-#     torch.distributed.init_process_group(
-#         backend=args.dist_backend, init_method=args.init_method, world_size=args.world_size, rank=args.rank
-#     )
-#     torch.distributed.barrier()
-#     mpu.initialize_model_parallel(args.tensor_model_parallel_size)
-#     setup_for_distributed(args.rank == 0)
-#     print(f"> initialized tensor model parallel with size " f"{mpu.get_tensor_model_parallel_world_size()}")
-
-
-# def DistributedParallel_Model(model, gpu_num):
-#     if is_dist_avail_and_initialized():
-#         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-#         if device == torch.device("cpu"):
-#             raise EnvironmentError("No GPUs, cannot initialize multigpu training.")
-#         model.to(device)
-#         for key in model.model:
-#             # model.model[key].to(device)
-#             # ddp_sub_model = torch.nn.parallel.DistributedDataParallel(model.model[key], device_ids=[gpu_num],
-#             #                                                         output_device=gpu_num, process_group=mpu.get_data_parallel_group(),
-#             #                                                         find_unused_parameters=True)
-#             ddp_sub_model = torch.nn.parallel.DistributedDataParallel(
-#                 model.model[key],
-#                 device_ids=[gpu_num],
-#                 output_device=gpu_num,
-#                 process_group=mpu.get_data_parallel_group(),
-#                 find_unused_parameters=True,
-#             )
-#             model.model[key] = ddp_sub_model
-
-#         # model.to(device)
-#         # model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[gpu_num])
-#         # model_without_ddp = model.module
-#     else:
-#         device = torch.device(f"cuda:{gpu_num}" if torch.cuda.is_available() else "cpu")
-#         model.to(device)
-#         # for key in model.model:
-#         #     model.model[key].to(device)
-
-#     return model
 
 
 class Dict(dict):
@@ -398,9 +279,6 @@ class Dict(dict):
 
     def __delattr__(self, name: str) -> None:
         del self[name]
-
-    # __setattr__ = dict.__setitem__
-    # __getattr__ = dict.__getitem__
 
 
 def dictToObj(dictObj):
@@ -425,23 +303,6 @@ def named_params_and_buffers(module):
     return list(module.named_parameters()) + list(module.named_buffers())
 
 
-# def check_ddp_consistency(module, ignore_regex=None):
-#     assert isinstance(module, torch.nn.Module)
-#     for name, tensor in named_params_and_buffers(module):
-#         fullname = type(module).__name__ + "." + name
-#         if ignore_regex is not None and re.fullmatch(ignore_regex, fullname):
-#             continue
-#         tensor = tensor.detach()
-#         # if tensor.is_floating_point():
-#         #     tensor = nan_to_num(tensor)
-#         other = tensor.clone()
-#         torch.distributed.broadcast(
-#             tensor=other, src=mpu.get_data_parallel_src_rank(), group=mpu.get_data_parallel_group()
-#         )
-#         # print(fullname, tensor.sum(), other.sum())
-#         assert (tensor == other).all(), fullname
-
-
 def collate_fn(batch):
     batch = list(zip(*batch))
     array_seq = np.stack(batch[0])
@@ -462,14 +323,18 @@ class data_prefetcher:
 
     def preload(self):
         try:
-            self.next_array_seq, self.next_origin_array_seq, self.next_date_time_seq = next(self.loader)
+            self.next_array_seq, self.next_origin_array_seq, self.next_date_time_seq = next(
+                self.loader)
         except StopIteration:
             self.next_array_seq = self.next_origin_array_seq = self.next_date_time_seq = None
             return
         with torch.cuda.stream(self.stream):
-            self.next_array_seq = self.next_array_seq.to(self.device, non_blocking=True)
-            self.next_origin_array_seq = self.next_origin_array_seq.to(self.device, non_blocking=True)
-            self.next_date_time_seq = self.next_date_time_seq.to(self.device, non_blocking=True)
+            self.next_array_seq = self.next_array_seq.to(
+                self.device, non_blocking=True)
+            self.next_origin_array_seq = self.next_origin_array_seq.to(
+                self.device, non_blocking=True)
+            self.next_date_time_seq = self.next_date_time_seq.to(
+                self.device, non_blocking=True)
 
     def next(self):
         torch.cuda.current_stream().wait_stream(self.stream)

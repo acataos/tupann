@@ -74,14 +74,11 @@ def plot_fields_intensities(ax, arr):
         color="red",
     )
     rainbow = mlp.colormaps["rainbow"]
-    # white = np.array([1, 1, 1, 1])
     # Create colormap for radar
     list_color = rainbow(np.linspace(0, 1, 256))
-    # list_color[: (256 // 6), :] = white
     cmpradar = ListedColormap(list_color)
     v_max = 30.0
     v_min = -30.0
-    # print(intensities.max(), intensities.min())
     ax.matshow(intensities.cpu().detach(),
                cmap=cmpradar, vmin=v_min, vmax=v_max)
 

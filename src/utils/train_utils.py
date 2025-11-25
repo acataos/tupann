@@ -213,7 +213,6 @@ def get_transforms(data_dict, folds, params, targets):
     transforms_output = {}
     inv_transforms_output = {}
     for target in targets:
-        print(targets)
         transform = data_dict["target"][target].get("transform", "identity")
         if target.split("#")[0] in ["fields_intensities", "nowcastrio_autoenc"]:
             target = target.split("#")[0]

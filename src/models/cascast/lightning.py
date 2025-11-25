@@ -33,7 +33,8 @@ class model(LModule):
         **kwargs,
     ):
         dum = torch.zeros([1, 256, 256])
-        true_target_dict = {"autoencoderklgan": target_shape_dict["autoencoderklgan"]}
+        true_target_dict = {
+            "autoencoderklgan": target_shape_dict["autoencoderklgan"]}
         auto_target = {"autoencoderklgan": dum.shape}
         super().__init__(
             input_shape_dict,
@@ -54,7 +55,8 @@ class model(LModule):
         self.input_shape = input_shape_dict["earthformer"][0]
 
         # just like cascast earthformer default params
-        config_autoencoder_loc = list(self.inv_transforms.keys())[0].split("#")[1]
+        config_autoencoder_loc = list(self.inv_transforms.keys())[
+            0].split("#")[1]
 
         self.config_castformet = kwargs.get("casformer", {})
         self.castformer = CasFormer(**self.config_castformet)
@@ -76,11 +78,13 @@ class model(LModule):
         # load autoencoder
         if autoenc_ckpt is not None:
             autoencoder_path = (
-                "models/autoencoderklgan/" + autoenc_hash + "/train/" + config_autoencoder_loc + "/" + autoenc_ckpt
+                "models/autoencoderklgan/" + autoenc_hash + "/train/" +
+                config_autoencoder_loc + "/" + autoenc_ckpt
             )
         else:
             autoencoder_path = (
-                "models/autoencoderklgan/" + autoenc_hash + "/train/" + config_autoencoder_loc + "/model_train.pt"
+                "models/autoencoderklgan/" + autoenc_hash + "/train/" +
+                config_autoencoder_loc + "/model_train.pt"
             )
         print(f"Loading autoencoder from {autoencoder_path}")
         if pathlib.Path(autoencoder_path).suffix == ".ckpt":
@@ -100,27 +104,33 @@ class model(LModule):
                 target_shape_dict=auto_target,
                 target_shape_dict_val=auto_target,
             ).requires_grad_(False)
-            autoencoder.load_state_dict(torch.load(autoencoder_path, map_location=self.device), strict=False)
+            autoencoder.load_state_dict(torch.load(
+                autoencoder_path, map_location=self.device), strict=False)
         autoencoder.eval()
         self.add_module("autoencoder", autoencoder)
 
         self.diffusion_kwargs = kwargs.get("diffusion_kwargs", {})
 
         ## init noise scheduler ##
-        self.noise_scheduler_kwargs = self.diffusion_kwargs.get("noise_scheduler", {})
+        self.noise_scheduler_kwargs = self.diffusion_kwargs.get(
+            "noise_scheduler", {})
 
         self.noise_scheduler_type = list(self.noise_scheduler_kwargs.keys())[0]
         if self.noise_scheduler_type == "DDPMScheduler":
             from diffusers import DDPMScheduler
 
-            self.noise_scheduler = DDPMScheduler(**self.noise_scheduler_kwargs[self.noise_scheduler_type])
-            num_train_timesteps = self.noise_scheduler_kwargs[self.noise_scheduler_type]["num_train_timesteps"]
+            self.noise_scheduler = DDPMScheduler(
+                **self.noise_scheduler_kwargs[self.noise_scheduler_type])
+            num_train_timesteps = self.noise_scheduler_kwargs[
+                self.noise_scheduler_type]["num_train_timesteps"]
             self.noise_scheduler.set_timesteps(num_train_timesteps)
         elif self.noise_scheduler_type == "DPMSolverMultistepScheduler":
             from diffusers import DPMSolverMultistepScheduler
 
-            self.noise_scheduler = DPMSolverMultistepScheduler(**self.noise_scheduler_kwargs[self.noise_scheduler_type])
-            num_train_timesteps = self.noise_scheduler_kwargs[self.noise_scheduler_type]["num_train_timesteps"]
+            self.noise_scheduler = DPMSolverMultistepScheduler(
+                **self.noise_scheduler_kwargs[self.noise_scheduler_type])
+            num_train_timesteps = self.noise_scheduler_kwargs[
+                self.noise_scheduler_type]["num_train_timesteps"]
             self.noise_scheduler.set_timesteps(num_train_timesteps)
         else:
             raise NotImplementedError
@@ -131,14 +141,16 @@ class model(LModule):
             print("############# USING SAMPLER: DDIMScheduler #############")
             from diffusers import DDIMScheduler
 
-            self.sample_noise_scheduler = DDIMScheduler(**self.noise_scheduler_kwargs[self.noise_scheduler_type])
-            ## set num of inference
+            self.sample_noise_scheduler = DDIMScheduler(
+                **self.noise_scheduler_kwargs[self.noise_scheduler_type])
+            # set num of inference
             self.sample_noise_scheduler.set_timesteps(20)
         elif self.sample_noise_scheduler_type == "DDPMScheduler":
             print("############# USING SAMPLER: DDPMScheduler #############")
             from diffusers import DDPMScheduler
 
-            self.sample_noise_scheduler = DDPMScheduler(**self.noise_scheduler_kwargs[self.noise_scheduler_type])
+            self.sample_noise_scheduler = DDPMScheduler(
+                **self.noise_scheduler_kwargs[self.noise_scheduler_type])
             self.sample_noise_scheduler.set_timesteps(1000)
         else:
             raise NotImplementedError
@@ -148,13 +160,17 @@ class model(LModule):
         # self.logger.info(f'####### noise scale: {self.noise_scale} ##########')
 
         ## scale factor ##
-        self.register_buffer("scale_factor", torch.tensor(scale_factor, dtype=torch.float32))
+        self.register_buffer("scale_factor", torch.tensor(
+            scale_factor, dtype=torch.float32))
         # self.logger.info(f'####### USE SCALE_FACTOR: {self.scale_factor} ##########')
 
         ## classifier free guidance ##
-        self.classifier_free_guidance_kwargs = self.diffusion_kwargs.get("classifier_free_guidance", {})
-        self.p_uncond = self.classifier_free_guidance_kwargs.get("p_uncond", 0.0)
-        self.guidance_weight = self.classifier_free_guidance_kwargs.get("guidance_weight", 0.0)
+        self.classifier_free_guidance_kwargs = self.diffusion_kwargs.get(
+            "classifier_free_guidance", {})
+        self.p_uncond = self.classifier_free_guidance_kwargs.get(
+            "p_uncond", 0.0)
+        self.guidance_weight = self.classifier_free_guidance_kwargs.get(
+            "guidance_weight", 0.0)
 
         # turn off automatic optimization
         self.automatic_optimization = False
@@ -191,7 +207,8 @@ class model(LModule):
         """
         _, t, c, h, w = template_data.shape
         cond_data = cond_data[:bs, ...]
-        generator = torch.Generator(device=template_data.device)  # torch.manual_seed(0)
+        generator = torch.Generator(
+            device=template_data.device)  # torch.manual_seed(0)
         generator.manual_seed(0)
         latents = torch.randn(
             (bs * ensemble_member, t, c, h, w),
@@ -206,29 +223,35 @@ class model(LModule):
             for t in tqdm(self.sample_noise_scheduler.timesteps):
                 ## predict the noise residual ##
                 timestep = torch.ones((bs,), device=template_data.device) * t
-                noise_pred = self.castformer(x=latents, timesteps=timestep, cond=cond_data)
+                noise_pred = self.castformer(
+                    x=latents, timesteps=timestep, cond=cond_data)
                 ## compute the previous noisy sample x_t -> x_{t-1} ##
-                latents = self.sample_noise_scheduler.step(noise_pred, t, latents).prev_sample
+                latents = self.sample_noise_scheduler.step(
+                    noise_pred, t, latents).prev_sample
             return latents
         else:
             ## for classifier free sampling ##
             cond_data = torch.cat([cond_data, torch.zeros_like(cond_data)])
             avg_latents = []
             for member in range(ensemble_member):
-                member_latents = latents[member * bs : (member + 1) * bs, ...]
+                member_latents = latents[member * bs: (member + 1) * bs, ...]
                 for t in self.sample_noise_scheduler.timesteps:
                     ## predict the noise residual ##
-                    timestep = torch.ones((bs * 2,), device=template_data.device) * t
+                    timestep = torch.ones(
+                        (bs * 2,), device=template_data.device) * t
                     latent_model_input = torch.cat([member_latents] * 2)
-                    latent_model_input = self.sample_noise_scheduler.scale_model_input(latent_model_input, t)
-                    noise_pred = self.castformer(x=latent_model_input, timesteps=timestep, cond=cond_data)
+                    latent_model_input = self.sample_noise_scheduler.scale_model_input(
+                        latent_model_input, t)
+                    noise_pred = self.castformer(
+                        x=latent_model_input, timesteps=timestep, cond=cond_data)
                     ########################
                     noise_pred_cond, noise_pred_uncond = noise_pred.chunk(2)
-                    noise_pred = noise_pred_uncond + cfg * (noise_pred_cond - noise_pred_uncond)
+                    noise_pred = noise_pred_uncond + cfg * \
+                        (noise_pred_cond - noise_pred_uncond)
                     ## compute the previous noisy sample x_t -> x_{t-1} ##
-                    member_latents = self.sample_noise_scheduler.step(noise_pred, t, member_latents).prev_sample
+                    member_latents = self.sample_noise_scheduler.step(
+                        noise_pred, t, member_latents).prev_sample
                 avg_latents.append(member_latents)
-            # print("end sampling")
             avg_latents = torch.stack(avg_latents, dim=1)
             return avg_latents
 
@@ -270,7 +293,7 @@ class model(LModule):
         # Init the optimizer
         optimazer_diff = self.optimizers()
         b, t, c, h, w = tar.shape
-        ## inp is coarse prediction in latent space, tar is gt in latent space
+        # inp is coarse prediction in latent space, tar is gt in latent space
         z_tar = tar
         z_coarse_prediction = inp
         ## init scale_factor ##
@@ -289,15 +312,18 @@ class model(LModule):
         noise = torch.randn_like(z_tar)
         ## sample random timestep for each ##
         bs = inp.shape[0]
-        timesteps = torch.randint(0, self.noise_scheduler.config.num_train_timesteps, (bs,), device=inp.device)
+        timesteps = torch.randint(
+            0, self.noise_scheduler.config.num_train_timesteps, (bs,), device=inp.device)
         noisy_tar = self.noise_scheduler.add_noise(z_tar, noise, timesteps)
 
         ## predict the noise residual ##
-        noise_pred = self.castformer(x=noisy_tar, timesteps=timesteps, cond=z_coarse_prediction_cond)
+        noise_pred = self.castformer(
+            x=noisy_tar, timesteps=timesteps, cond=z_coarse_prediction_cond)
         train_loss_f = self.train_loss()
         loss = train_loss_f(noise_pred, noise)  # important: rescale the loss
         loss.backward()
-        self.log("train_l2_noise", loss, prog_bar=True, on_epoch=True, sync_dist=True)
+        self.log("train_l2_noise", loss, prog_bar=True,
+                 on_epoch=True, sync_dist=True)
         ## update params of diffusion model ##
         optimazer_diff.step()
         optimazer_diff.zero_grad()
@@ -306,7 +332,7 @@ class model(LModule):
         data_dict = self.data_preprocess(batch)
         inp, tar, _ = data_dict
         b, t, c, h, w = tar.shape
-        ## inp is coarse prediction in latent space, tar is gt in latent space
+        # inp is coarse prediction in latent space, tar is gt in latent space
         z_tar = tar
         z_coarse_prediction = inp
         ## scale ##
@@ -316,14 +342,17 @@ class model(LModule):
         noise = torch.randn_like(z_tar)
         ## sample random timestep for each ##
         bs = inp.shape[0]
-        timesteps = torch.randint(0, self.noise_scheduler.config.num_train_timesteps, (bs,), device=inp.device)
+        timesteps = torch.randint(
+            0, self.noise_scheduler.config.num_train_timesteps, (bs,), device=inp.device)
         noisy_tar = self.noise_scheduler.add_noise(z_tar, noise, timesteps)
 
         ## predict the noise residual ##
-        noise_pred = self.castformer(x=noisy_tar, timesteps=timesteps, cond=z_coarse_prediction)
+        noise_pred = self.castformer(
+            x=noisy_tar, timesteps=timesteps, cond=z_coarse_prediction)
         train_loss_f = self.train_loss()
         loss = train_loss_f(noise_pred, noise)  # important: rescale the loss
-        self.log("val_l2_noise", loss, prog_bar=True, on_epoch=True, sync_dist=True)
+        self.log("val_l2_noise", loss, prog_bar=True,
+                 on_epoch=True, sync_dist=True)
         return noise_pred
 
     def on_validation_batch_end(self, outputs, batch, batch_idx) -> None:
@@ -348,7 +377,7 @@ class model(LModule):
 
     def forward_denoise_out_latent(self, inp, cfg_weight=1, ens_member=1):
         b, t, c, h, w = inp.shape
-        ## inp is coarse prediction in latent space, tar is gt in latent space
+        # inp is coarse prediction in latent space, tar is gt in latent space
         z_coarse_prediction = inp
         ## scale ##
         z_coarse_prediction = z_coarse_prediction * self.scale_factor
@@ -367,9 +396,12 @@ class model(LModule):
         sample_predictions = []
         for i in range(n):
             member_z_sample_prediction = z_sample_prediction[:, i, ...]
-            member_z_sample_prediction = rearrange(member_z_sample_prediction, "b t c h w -> (b t) c h w").contiguous()
-            member_sample_prediction = self.decode_stage(member_z_sample_prediction)
-            member_sample_prediction = rearrange(member_sample_prediction, "(b t) c h w -> b t c h w", t=t)
+            member_z_sample_prediction = rearrange(
+                member_z_sample_prediction, "b t c h w -> (b t) c h w").contiguous()
+            member_sample_prediction = self.decode_stage(
+                member_z_sample_prediction)
+            member_sample_prediction = rearrange(
+                member_sample_prediction, "(b t) c h w -> b t c h w", t=t)
             sample_predictions.append(member_sample_prediction)
         sample_predictions = torch.stack(sample_predictions, dim=1)
 
@@ -408,10 +440,13 @@ class model(LModule):
             if n_locations == 1:
                 location = locations[0]
                 y_hat_trans[key] = transformation[location](y_hat_dict[key])
-                y_trans[key] = transformation[location](target[key].to(self.device))
+                y_trans[key] = transformation[location](
+                    target[key].to(self.device))
             else:
-                y_hat_trans[key] = transform_multiple_loc(transformation, y_hat_dict[key], locations)
-                y_trans[key] = transform_multiple_loc(transformation, target[key].to(self.device), locations)
+                y_hat_trans[key] = transform_multiple_loc(
+                    transformation, y_hat_dict[key], locations)
+                y_trans[key] = transform_multiple_loc(
+                    transformation, target[key].to(self.device), locations)
 
         if type(y_hat) is tuple:
             y_hat = y_hat[0]

@@ -51,14 +51,14 @@ def make_pred(
     X_dict, y_dict = ds[it][:2]
     metadata_location = ds[it][3]
     input_dataset = list(X_dict.keys())[0]
-    print(input_dataset)
     X = X_dict[input_dataset]
     y = y_dict[list(y_dict.keys())[0]]
     locations = metadata_location["location"]
 
     n_locations = len(set(locations)) if isinstance(locations, list) else 1
     if n_locations > 1:
-        raise ValueError("Multiple locations not supported for Pysteps. Predict each location separately.")
+        raise ValueError(
+            "Multiple locations not supported for Pysteps. Predict each location separately.")
     else:
         location = locations[0] if isinstance(locations, list) else locations
     # transformation_data = transform[list(y_dict.keys())[0]]
@@ -94,11 +94,14 @@ def make_pred(
         # Transform data to rain rate for correct use of STEPS method
         # Use Z-R relation
         # Note that not much is changed if unit is set to mm/h
-        train_precip_pre = conversion.to_rainrate(Xt, metadata, zr_a=a_z, zr_b=b_z)[0]
-        train_precip_pre[torch.isclose(torch.tensor(train_precip_pre), torch.tensor(0.0), atol=1e-04)] = 0.0
+        train_precip_pre = conversion.to_rainrate(
+            Xt, metadata, zr_a=a_z, zr_b=b_z)[0]
+        train_precip_pre[torch.isclose(torch.tensor(
+            train_precip_pre), torch.tensor(0.0), atol=1e-04)] = 0.0
 
         # Change to dB
-        train_precip = transformation.dB_transform(train_precip_pre, metadata)[0]
+        train_precip = transformation.dB_transform(
+            train_precip_pre, metadata)[0]
 
         # Set zerovalue
         train_precip[~np.isfinite(train_precip)] = zero
@@ -123,7 +126,8 @@ def make_pred(
             )
 
             # Compute mean value from ensemble
-            precip_forecast_mean = torch.nanmean(torch.from_numpy(precip_forecast_ens), dim=0)
+            precip_forecast_mean = torch.nanmean(
+                torch.from_numpy(precip_forecast_ens), dim=0)
 
             # Undo transformations made for STEPS model
             precip_forecast = 10 ** (precip_forecast_mean / 10)
@@ -153,7 +157,8 @@ def make_pred(
         precip_forecast = inv_transformation_data[location](precip_forecast)
         yt = inv_transformation_data[location](yt)
     else:
-        raise ValueError("Multiple locations not supported for Pysteps. Predict each location separately.")
+        raise ValueError(
+            "Multiple locations not supported for Pysteps. Predict each location separately.")
         # precip_forecast = transform_multiple_loc(inv_transformation_data, precip_forecast, locations)
         # yt = transform_multiple_loc(inv_transformation_data, yt, locations)
 
@@ -165,17 +170,22 @@ def main(args):
         pathlib.Path(f"configs/data/{args.data_config}.yaml").read_text(),
     )
     # Assert target is of the same format as input and that there is only one of each
-    assert len(list(data_dict["target"].keys())) == 1, "Ony one input may be passed."
-    assert len(list(data_dict["input"].keys())) == 1, "Ony one target may be passed."
+    assert len(list(data_dict["target"].keys())
+               ) == 1, "Ony one input may be passed."
+    assert len(list(data_dict["input"].keys())
+               ) == 1, "Ony one target may be passed."
     assert (
-        list(data_dict["target"].keys())[0] == list(data_dict["input"].keys())[0]
+        list(data_dict["target"].keys())[0] == list(
+            data_dict["input"].keys())[0]
     ), "Input dataset and target dataset must be the same."
 
     splits = ["train", "val", "test"]
     fold_dict = dict(
-        [(k, v) for k, v in data_dict.items() if k not in splits] + [(k, v) for k, v in data_dict[args.fold].items()]
+        [(k, v) for k, v in data_dict.items() if k not in splits] + [(k, v)
+                                                                     for k, v in data_dict[args.fold].items()]
     )
-    test_dataset = GeneralDataset({**fold_dict, "split": args.fold, "config": args.data_config}, return_metadata=True)
+    test_dataset = GeneralDataset(
+        {**fold_dict, "split": args.fold, "config": args.data_config}, return_metadata=True)
     targets = list(data_dict["target"].keys())
     if not len(targets) == 1:
         raise Exception("Prediction must be done for one dataset.")
@@ -227,7 +237,8 @@ def main(args):
     chunk_indices = np.arange(0, size, step)
     if chunk_indices[-1] != size:
         chunk_indices = np.append(chunk_indices, [size])
-    transform, inv_transform = get_transforms(data_dict, [args.fold], params_for_transform, targets)
+    transform, inv_transform = get_transforms(
+        data_dict, [args.fold], params_for_transform, targets)
     # Fix second entry of make_pred function to use parallelism
     task = partial(
         make_pred,
@@ -243,7 +254,8 @@ def main(args):
     for i, j in tqdm(zip(chunk_indices, chunk_indices[1:]), total=len(chunk_indices) - 1):
         chunk_iterable = range(i, j)
         # breakpoint()
-        full_list = Parallel(n_jobs=step, backend="threading")(delayed(task)(it) for it in chunk_iterable)
+        full_list = Parallel(n_jobs=step, backend="threading")(
+            delayed(task)(it) for it in chunk_iterable)
         predicts_list = [item[0] for item in full_list]
         target_list = [item[1] for item in full_list]
 
@@ -266,7 +278,8 @@ def main(args):
 
     # compute and save predictions
     output_path = f"models/{model_path}/predictions/{data_name}"
-    output_model_filepath = pathlib.Path(f"{output_path}/predict_{args.fold}.npy")
+    output_model_filepath = pathlib.Path(
+        f"{output_path}/predict_{args.fold}.npy")
     pathlib.Path(output_path).mkdir(parents=True, exist_ok=True)
 
     # define logger
@@ -301,8 +314,10 @@ def main(args):
             f"{output_path_metrics}/metrics_{args.ckpt_file.replace('.ckpt', '')}_{args.fold}_agg.csv"
         )
     else:
-        output_metrics_filepath = pathlib.Path(f"{output_path_metrics}/metrics_{args.fold}.csv")
-        output_metrics_filepath_agg = pathlib.Path(f"{output_path_metrics}/metrics_{args.fold}_agg.csv")
+        output_metrics_filepath = pathlib.Path(
+            f"{output_path_metrics}/metrics_{args.fold}.csv")
+        output_metrics_filepath_agg = pathlib.Path(
+            f"{output_path_metrics}/metrics_{args.fold}_agg.csv")
     overwrite_file(output_metrics_filepath, args.overwrite, logger)
     overwrite_file(output_metrics_filepath_agg, args.overwrite, logger)
 

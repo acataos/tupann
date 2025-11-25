@@ -45,12 +45,15 @@ class GeneralDataset(Dataset):
         self.return_metadata = return_metadata
         # assert target size is constant
         assert (
-            len(set([len(target_lags["lags"]) for target_lags in self.target.values()])) == 1
+            len(set([len(target_lags["lags"])
+                for target_lags in self.target.values()])) == 1
         ), "Target size must be constant across locations"
         self.target_length = len(list(self.target.values())[0]["lags"])
-        self.leadtime_length = dataset_specs.get("leadtime_length", self.target_length)
+        self.leadtime_length = dataset_specs.get(
+            "leadtime_length", self.target_length)
         assert self.leadtime_length <= self.target_length, "Leadtime length must be less than or equal to target length"
-        self.dt_len = np.cumsum(np.array([len(dts) for dts in self.datetimes_dict.values()]))
+        self.dt_len = np.cumsum(
+            np.array([len(dts) for dts in self.datetimes_dict.values()]))
         self.ndt = self.dt_len[-1]
         self.nlt = self.target_length - self.leadtime_length + 1
 
@@ -106,7 +109,8 @@ class GeneralDataset(Dataset):
                 data_key = dataset_name.split("#")[0]
             lags = input_specs["lags"]
             if not no_transform:
-                transform = transformations[input_specs.get("transform", "identity")]
+                transform = transformations[input_specs.get(
+                    "transform", "identity")]
                 transformation = partial(
                     transform,
                     **self.transform_parameters[dataset_name][self.locations[loc_index]],
@@ -114,7 +118,8 @@ class GeneralDataset(Dataset):
             else:
                 transformation = identity_transform
             curr_dt = self.datetimes_dict[self.locations[loc_index]][
-                dt_index - (0 if loc_index == 0 else self.dt_len[loc_index - 1])
+                dt_index - (0 if loc_index ==
+                            0 else self.dt_len[loc_index - 1])
             ]
             dts = [curr_dt + datetime.timedelta(minutes=lag) for lag in lags]
             input_dict[data_key] = transformation(
@@ -137,14 +142,16 @@ class GeneralDataset(Dataset):
                 data_key = dataset_name.split("#")[0]
             lags = target_specs["lags"]
             if not no_transform:
-                transform = transformations[target_specs.get("transform", "identity")]
+                transform = transformations[target_specs.get(
+                    "transform", "identity")]
                 transformation = partial(
                     transform,
                     **self.transform_parameters[dataset_name][self.locations[loc_index]],
                 )
             else:
                 transformation = identity_transform
-            dts = [curr_dt + datetime.timedelta(minutes=lag) for lag in lags[lt_index : lt_index + leadtime_length]]
+            dts = [curr_dt + datetime.timedelta(minutes=lag)
+                   for lag in lags[lt_index: lt_index + leadtime_length]]
             target_dict[data_key] = transformation(
                 torch.from_numpy(
                     self._handlers[dataset_name].fetch(
@@ -187,9 +194,9 @@ class GeneralDataset(Dataset):
         elif self.config_name == "goes16_cascast_indentity_miami":
             weights_filepath = pathlib.Path("data/weights/goes16_miami.npy")
         else:
-            # breakpoint()
             data_size = np.arange(len(self))
-            loc_index = np.sum(np.array(self.dt_len).reshape(-1, 1) <= data_size.reshape(1, -1), axis=0)
+            loc_index = np.sum(np.array(self.dt_len).reshape(-1, 1)
+                               <= data_size.reshape(1, -1), axis=0)
             for loc, dt_file in enumerate(self.datetimes_files):
                 weights_dict = {
                     "dataset_name": list(self.input.keys())[0],
@@ -197,12 +204,9 @@ class GeneralDataset(Dataset):
                     "lags": list(self.input.values())[0]["lags"],
                     "datetimes": dt_file,
                 }
-                print(weights_dict)
                 weights_hash = calc_dict_hash(weights_dict)
-                # if self.cropped_window is not None:
-                #     weights_hash += f"_{self.cropped_window}"
-                weights_filepath = pathlib.Path(f"data/weights/{weights_hash}.npy")
-                print(weights_filepath)
+                weights_filepath = pathlib.Path(
+                    f"data/weights/{weights_hash}.npy")
                 if not overwrite_if_exists and weights_filepath.is_file():
                     weights = np.load(weights_filepath)
                     weights = weights / weights.sum()
@@ -213,23 +217,22 @@ class GeneralDataset(Dataset):
                     def task(i):
                         X = self.__getitem__(i, calc_weights=True)
                         X[X < 0] = 0
-                        assert torch.all(X >= -0.000001), "Input data must be positive for weight calculation."
+                        assert torch.all(
+                            X >= -0.000001), "Input data must be positive for weight calculation."
                         weight = torch.sum(1 - torch.exp(-torch.nan_to_num(X)))
                         weight += MIN_WEIGHT
                         return weight
 
-                    # cpu_count = os.cpu_count()
-                    # weights = Parallel(n_jobs=cpu_count)(delayed(task)(i) for i in tqdm.tqdm(range(len(self) // self.nlt)))
                     idx = np.where(loc_index == loc)[0]
                     weights = [task(i) for i in tqdm.tqdm(idx)]
                     weights = np.array(weights)
                     weights = weights / weights.sum()
-                    weights_filepath.parents[0].mkdir(parents=True, exist_ok=True)
+                    weights_filepath.parents[0].mkdir(
+                        parents=True, exist_ok=True)
                     np.save(weights_filepath, weights)
                     weights = np.tile(weights, (self.nlt, 1)).T.flatten()
                     weights_list.append(weights)
             weights = np.concatenate(weights_list)
-            # breakpoint()
             assert len(weights) == len(self)
             return weights
 
@@ -237,16 +240,13 @@ class GeneralDataset(Dataset):
 
         def task(i):
             X = self.__getitem__(i, calc_weights=True)
-            # if self.cropped_window is not None:
-            #     X = center_crop(X, self.cropped_window, self.cropped_window)
             X[X < 0] = 0
-            assert torch.all(X >= -0.000001), "Input data must be positive for weight calculation."
+            assert torch.all(
+                X >= -0.000001), "Input data must be positive for weight calculation."
             weight = torch.sum(1 - torch.exp(-torch.nan_to_num(X)))
             weight += MIN_WEIGHT
             return weight
 
-        # cpu_count = os.cpu_count()
-        # weights = Parallel(n_jobs=cpu_count)(delayed(task)(i) for i in tqdm.tqdm(range(len(self) // self.nlt)))
         weights = [task(i) for i in tqdm.tqdm(range(len(self) // self.nlt))]
         weights = np.array(weights)
         weights = weights / weights.sum()
@@ -265,7 +265,8 @@ class GeneralDataset(Dataset):
         """
         data_size = np.arange(len(self))
         dt_index = data_size // self.nlt
-        loc_index = np.sum(np.array(self.dt_len).reshape(-1, 1) <= dt_index.reshape(1, -1), axis=0)
+        loc_index = np.sum(np.array(self.dt_len).reshape(-1, 1)
+                           <= dt_index.reshape(1, -1), axis=0)
         locations = [self.locations[i] for i in loc_index]
         return locations
 

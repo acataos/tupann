@@ -105,7 +105,6 @@ def main(datetimes: list[datetime], dataset: str = "goes16_rrqpe", location: str
                     dts.append(dt + timedelta(minutes=i *
                                dataset_dict[dataset]["timestep"]))
                 tensor = torch.tensor(dataset_handler.fetch(dts, location))
-                print(tensor.max())
                 tensor = torch.nan_to_num(tensor)
                 tensor = tensor.float()
                 # compute motion field

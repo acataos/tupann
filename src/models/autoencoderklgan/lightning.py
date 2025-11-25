@@ -108,14 +108,14 @@ class model(LModule):
                 on_epoch=True,
                 sync_dist=True,
             )
-            self.log("aeloss", aeloss, prog_bar=True, on_epoch=True, sync_dist=True)
+            self.log("aeloss", aeloss, prog_bar=True,
+                     on_epoch=True, sync_dist=True)
 
         optimizer_auto.zero_grad()
         # Use manual backward to avoid automatic optimization
         self.manual_backward(aeloss)
         # optimizer_auto.step()  # Step the optimizer manually
         optimizer_auto.step()
-        # print learning rate
         with torch.no_grad():
             self.log(
                 "learning_rate",
@@ -141,7 +141,8 @@ class model(LModule):
         self.manual_backward(disloss)
         optimizer_disc.step()
         with torch.no_grad():
-            self.log("disloss", disloss, prog_bar=True, on_epoch=True, sync_dist=True)
+            self.log("disloss", disloss, prog_bar=True,
+                     on_epoch=True, sync_dist=True)
 
     def validation_step(self, batch_data, batch_idx):
         inp_dict, tar_dir = batch_data[:2]
@@ -161,7 +162,8 @@ class model(LModule):
             split="val",
         )
 
-        self.log("val_aeloss", aeloss, prog_bar=True, on_epoch=True, sync_dist=True)
+        self.log("val_aeloss", aeloss, prog_bar=True,
+                 on_epoch=True, sync_dist=True)
 
         ## second: the discriminator ##
         disloss, _ = self.lpipsWithDisc(
@@ -175,7 +177,8 @@ class model(LModule):
             split="val",
         )
 
-        self.log("val_disloss", disloss, prog_bar=True, on_epoch=True, sync_dist=True)
+        self.log("val_disloss", disloss, prog_bar=True,
+                 on_epoch=True, sync_dist=True)
 
         return {list(tar_dir.keys())[0]: reconstruction}
 
@@ -239,13 +242,16 @@ class model(LModule):
             reconstruction = transformation[location](reconstruction)
             tar = transformation[location](tar)
         else:
-            reconstruction = transform_multiple_loc(transformation, reconstruction, locations)
+            reconstruction = transform_multiple_loc(
+                transformation, reconstruction, locations)
             tar = transform_multiple_loc(transformation, tar, locations)
 
         if update_metrics:
             # Calculate the metrics
-            self.eval_metrics_agg.update(target=tar[:, :, None], pred=reconstruction[:, :, None])
-            self.eval_metrics_lag.update(target=tar[:, :, None], pred=reconstruction[:, :, None])
+            self.eval_metrics_agg.update(
+                target=tar[:, :, None], pred=reconstruction[:, :, None])
+            self.eval_metrics_lag.update(
+                target=tar[:, :, None], pred=reconstruction[:, :, None])
 
         if self.predict_latent:
             return z_input[:, None]
