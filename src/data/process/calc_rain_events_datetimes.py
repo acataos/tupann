@@ -18,6 +18,7 @@ def main(rain_events_file, exclude_first=0, exclude_last=0):
         dt_range = pd.date_range(start, end, freq=f"{TIMESTEP_SIZE}min")
         dt_range = dt_range[exclude_first: len(dt_range)-exclude_last]
         results.extend(dt_range)
+    return results
 
 
 if __name__ == "__main__":

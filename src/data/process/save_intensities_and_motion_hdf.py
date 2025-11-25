@@ -76,7 +76,7 @@ def warp(input, flow, grid, mode="bilinear", padding_mode="zeros", fill_value=0.
     return output
 
 
-def main(datetimes: [datetime], dataset: str = "goes16_rrqpe", location: str = "rio_de_janeiro"):
+def main(datetimes: list[datetime], dataset: str = "goes16_rrqpe", location: str = "rio_de_janeiro"):
     sample_tensor = torch.zeros(1, 1, 256, 256)
     grid = make_grid(sample_tensor)
 
