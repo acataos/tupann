@@ -91,8 +91,6 @@ def main(rain_events_file, product="ABI-L2-RRQPEF", location="rio_de_janeiro", n
                         found = True
                 event_to_dts[i].append(dt)
 
-        import time
-
         for event_id, dts in tqdm(event_to_dts.items(), total=len(event_to_dts)):
             df_file = f"{sat_folder}/event_id={i:04d}.feather"
             sd = SatelliteData.load_data(

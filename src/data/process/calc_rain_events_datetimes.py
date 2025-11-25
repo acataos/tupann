@@ -9,7 +9,7 @@ TIMESTEP_SIZE = 10
 
 
 def main(rain_events_file, exclude_first=0, exclude_last=0):
-    file = pathlib.Path(args.yaml_file)
+    file = pathlib.Path(rain_events_file)
     rain_events_list = yaml.safe_load(open(file))
     results = []
     for event in rain_events_list:
