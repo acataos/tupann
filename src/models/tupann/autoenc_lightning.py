@@ -4,10 +4,10 @@ import torch.nn.functional as F
 from torch.optim.lr_scheduler import LambdaLR
 
 from src.models.lightning import LModule
-from src.models.nowcastrio.autoenc_parts.autoenc_utils import DiagonalGaussianDistribution
-from src.models.nowcastrio.autoenc_parts.modules import Decoder, Encoder
-from src.models.nowcastrio.utils import make_grid, warp
-from src.utils.lightning_utils import  transform_multiple_loc
+from src.models.tupann.autoenc_parts.autoenc_utils import DiagonalGaussianDistribution
+from src.models.tupann.autoenc_parts.modules import Decoder, Encoder
+from src.models.tupann.utils import make_grid, warp
+from src.utils.lightning_utils import transform_multiple_loc
 
 # def wait():
 #     estructure_time = time.localtime()
@@ -38,7 +38,8 @@ class model(LModule):
         predict_latent: bool = False,
         **kwargs,
     ):
-        true_target_dict = {list(target_shape_dict.keys())[0]: target_shape_dict[list(target_shape_dict.keys())[0]]}
+        true_target_dict = {list(target_shape_dict.keys())[
+            0]: target_shape_dict[list(target_shape_dict.keys())[0]]}
         super().__init__(
             input_shape_dict,
             true_target_dict,
@@ -58,14 +59,16 @@ class model(LModule):
         self.lambda_ = lanbda_
         self.predict_latent = predict_latent
         self.lead_time_cond = lead_time_cond
-        self.fields_intensities_key = "fields_intensities" 
+        self.fields_intensities_key = "fields_intensities"
 
         self.g1 = torch.broadcast_to(
-            torch.tensor([[1, 0, -1], [2, 0, -2], [1, 0, -1]], dtype=torch.float32), (1, 1, 3, 3)
+            torch.tensor([[1, 0, -1], [2, 0, -2], [1, 0, -1]],
+                         dtype=torch.float32), (1, 1, 3, 3)
         )
 
         self.g2 = torch.broadcast_to(
-            torch.tensor([[1, 2, 1], [0, 0, 0], [-1, -2, -1]], dtype=torch.float32), (1, 1, 3, 3)
+            torch.tensor([[1, 2, 1], [0, 0, 0], [-1, -2, -1]],
+                         dtype=torch.float32), (1, 1, 3, 3)
         )
 
         # assert len(list(true_target_dict.values())) == 1, "Target should a dictionary with a single value"
@@ -75,7 +78,8 @@ class model(LModule):
         self.input_length = self.in_shape[0]
         self.target_length = list(target_shape_dict.values())[0][0]
         self.img_size = self.in_shape[-1]
-        self.register_buffer("sample_tensor", torch.zeros(1, 1, self.img_size, self.img_size))
+        self.register_buffer("sample_tensor", torch.zeros(
+            1, 1, self.img_size, self.img_size))
         self.register_buffer("grid", make_grid(self.sample_tensor))
         self.name = "autoenc"
 
@@ -155,7 +159,8 @@ class model(LModule):
         cossim = -self.cos_loss(motions_field_real, field_pred).mean()
         l1_intensities = torch.abs(intensities_real - intensity_pred).mean()
 
-        rec_loss_vector = self.loss_weight * cossim + (1.0 - self.loss_weight) * l1_vector
+        rec_loss_vector = self.loss_weight * cossim + \
+            (1.0 - self.loss_weight) * l1_vector
         rec_loss_intensities = l1_intensities
 
         # If we want to use the evolution network loss.
@@ -177,10 +182,13 @@ class model(LModule):
             loss = (
                 (1 - self.future_image_loss)
                 * (self.vector_weight * rec_loss_vector + (1 - self.vector_weight) * rec_loss_intensities)
-                + self.future_image_loss * torch.abs(image_real - image_pred).mean()
+                + self.future_image_loss *
+                torch.abs(image_real - image_pred).mean()
                 + self.kl_weight * kl_loss
-                + self.lambda_ * torch.mean((torch.pow(dv1x, 2) + torch.pow(dv1y, 2)))
-                + self.lambda_ * torch.mean((torch.pow(dv2x, 2) + torch.pow(dv2y, 2)))
+                + self.lambda_ *
+                torch.mean((torch.pow(dv1x, 2) + torch.pow(dv1y, 2)))
+                + self.lambda_ *
+                torch.mean((torch.pow(dv2x, 2) + torch.pow(dv2y, 2)))
             )
             log = {
                 "{}/total_loss".format(split): loss.detach().mean(),
@@ -191,7 +199,8 @@ class model(LModule):
                 "{}/cossim".format(split): cossim.detach().mean(),
                 "{}/rec_loss_intensities".format(split): rec_loss_intensities.detach().mean(),
                 "{}/vector_regularization".format(split): torch.mean(
-                    (torch.pow(dv1x, 2) + torch.pow(dv1y, 2)) + (torch.pow(dv2x, 2) + torch.pow(dv2y, 2))
+                    (torch.pow(dv1x, 2) + torch.pow(dv1y, 2)) +
+                    (torch.pow(dv2x, 2) + torch.pow(dv2y, 2))
                 )
                 .detach()
                 .mean(),
@@ -232,7 +241,8 @@ class model(LModule):
         cossim = -self.cos_loss(motion_truth, motion_predict).mean()
         l1_intensities = torch.abs(intensities_truth - intensities_pred).mean()
 
-        rec_loss_vector = self.loss_weight * cossim + (1.0 - self.loss_weight) * l1_vector
+        rec_loss_vector = self.loss_weight * cossim + \
+            (1.0 - self.loss_weight) * l1_vector
         rec_loss_intensities = l1_intensities
         loss = (
             self.vector_weight * rec_loss_vector
@@ -257,7 +267,6 @@ class model(LModule):
         motion_fields = Y[self.fields_intensities_key][:, :, :2].squeeze()
         intensities = Y[self.fields_intensities_key][:, :, 2].squeeze()
 
-
         assert len(X.keys()) == 1, "Expected a single key in the input batch."
         input = X[list(X.keys())[0]]
         reconstructions, posterior = self(input)
@@ -272,7 +281,8 @@ class model(LModule):
             def loc_inv_transform(t):
                 return torch.cat(
                     [
-                        self.inv_transforms[list(Y.keys())[1]][locations[i]](t[i]).unsqueeze(0)
+                        self.inv_transforms[list(Y.keys())[1]][locations[i]](
+                            t[i]).unsqueeze(0)
                         for i in range(t.shape[0])
                     ],
                     dim=0,
@@ -366,7 +376,8 @@ class model(LModule):
 
         def loc_inv_transform(t):
             return torch.cat(
-                [self.inv_transforms[list(Y.keys())[1]][locations[i]](t[i]).unsqueeze(0) for i in range(t.shape[0])],
+                [self.inv_transforms[list(Y.keys())[1]][locations[i]](
+                    t[i]).unsqueeze(0) for i in range(t.shape[0])],
                 dim=0,
             )
 
@@ -374,7 +385,8 @@ class model(LModule):
         input = X[list(X.keys())[0]]
         x_ini = input[:, -1][:, None, :, :]
 
-        pred = self.forward_lead_time_all(input, x_ini, transform=loc_transform, inv_transform=loc_inv_transform)
+        pred = self.forward_lead_time_all(
+            input, x_ini, transform=loc_transform, inv_transform=loc_inv_transform)
         image_pred, intensities_pred, motion_fields_pred, posterior = pred
 
         val_loss, log_dict_ae = self.loss_val(
@@ -399,14 +411,16 @@ class model(LModule):
 
         def loc_transform(t):
             return torch.cat(
-                [self.transforms[list(y_dict.keys())[1]][locations[i]](t[i]).unsqueeze(0) for i in range(t.shape[0])],
+                [self.transforms[list(y_dict.keys())[1]][locations[i]](
+                    t[i]).unsqueeze(0) for i in range(t.shape[0])],
                 dim=0,
             )
 
         def loc_inv_transform(t):
             return torch.cat(
                 [
-                    self.inv_transforms[list(y_dict.keys())[1]][locations[i]](t[i]).unsqueeze(0)
+                    self.inv_transforms[list(y_dict.keys())[1]][locations[i]](
+                        t[i]).unsqueeze(0)
                     for i in range(t.shape[0])
                 ],
                 dim=0,
@@ -433,8 +447,10 @@ class model(LModule):
                 y_hat_trans[key] = transformation[location](y_hat[key])
                 y_trans[key] = transformation[location](y_dict[key])
             else:
-                y_hat_trans[key] = transform_multiple_loc(transformation, y_hat[key], locations)
-                y_trans[key] = transform_multiple_loc(transformation, y_dict[key], locations)
+                y_hat_trans[key] = transform_multiple_loc(
+                    transformation, y_hat[key], locations)
+                y_trans[key] = transform_multiple_loc(
+                    transformation, y_dict[key], locations)
 
         if update_metrics:
             self.eval_metrics.update(

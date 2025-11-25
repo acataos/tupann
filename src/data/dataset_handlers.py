@@ -223,8 +223,8 @@ class PredictionsHandler(DatasetHandler):
             "evonet": (256, 256),
             "autoencoderklgan": (4, 32, 32),
             "earthformer": (4, 32, 32),
-            "nowcastrio": (256, 256),
-            "nowcastrio_autoenc": (8, 64, 64),
+            "tupann": (256, 256),
+            "tupann_autoenc": (8, 64, 64),
         }
         list_data = dataset.split("#")
         if len(list_data) in [3, 4]:
@@ -238,8 +238,8 @@ class PredictionsHandler(DatasetHandler):
             "evonet": "evolution_network",
             "autoencoderklgan": "autoencoderklgan",
             "earthformer": "earthformer",
-            "nowcastrio": "nowcastrio",
-            "nowcastrio_autoenc": "nowcastrio_autoenc",
+            "tupann": "tupann",
+            "tupann_autoenc": "tupann_autoenc",
         }
         data_shape = data_shape_map[self.model]
         self.model_name = model_name_map.get(self.model)
@@ -276,7 +276,7 @@ class PredictionsHandler(DatasetHandler):
 
             results = []
             with h5py.File(dataset_path, "r") as hdf:
-                if self.model == "earthformer" or self.model == "evonet" or self.model == "nowcastrio":
+                if self.model == "earthformer" or self.model == "evonet" or self.model == "tupann":
                     keys = [
                         f"{curr_dt.strftime('%Y-%m-%d %H:%M:%S')}/" f"{dt.strftime('%Y%m%d-%H%M')}" for dt in datetimes
                     ]
@@ -303,7 +303,7 @@ class PredictionsHandler(DatasetHandler):
                             self.logger.debug(f"Key {key}/{n_key} not found")
                             results.append(
                                 np.zeros(self.data_shape, dtype=np.float32))
-                elif self.model == "nowcastrio_autoenc":
+                elif self.model == "tupann_autoenc":
                     keys = [
                         f"{dt.strftime('%Y-%m-%d %H:%M:%S')}" for dt in datetimes]
                     same_need_keys = [
@@ -365,7 +365,8 @@ class FieldsIntensitiesHandler(DatasetHandler):
                 for key in keys:
                     try:
                         # Get intensities and add new axis
-                        intensities = np.squeeze(np.array(hdf["intensities"][key]))
+                        intensities = np.squeeze(
+                            np.array(hdf["intensities"][key]))
                         intensities = intensities[np.newaxis, :, :]
 
                         # Get motion fields
@@ -403,8 +404,8 @@ class DatasetHandlerFactory:
         "autoencoderklgan": PredictionsHandler,
         "earthformer": PredictionsHandler,
         "fields_intensities": FieldsIntensitiesHandler,
-        "nowcastrio_autoenc": PredictionsHandler,
-        "nowcastrio": PredictionsHandler,
+        "tupann_autoenc": PredictionsHandler,
+        "tupann": PredictionsHandler,
     }
 
     @classmethod

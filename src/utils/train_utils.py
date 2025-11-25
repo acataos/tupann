@@ -214,7 +214,7 @@ def get_transforms(data_dict, folds, params, targets):
     inv_transforms_output = {}
     for target in targets:
         transform = data_dict["target"][target].get("transform", "identity")
-        if target.split("#")[0] in ["fields_intensities", "nowcastrio_autoenc"]:
+        if target.split("#")[0] in ["fields_intensities", "tupann_autoenc"]:
             target = target.split("#")[0]
 
         inv_transforms_output[target] = {}

@@ -9,10 +9,9 @@ from torch.optim.lr_scheduler import CosineAnnealingLR, LambdaLR
 
 from src.models.lightning import LModule
 from src.models.metnet.metnet import Metnet
-from src.models.nowcastrio.autoenc_lightning import model as AutoencoderKL
-from src.models.nowcastrio.utils import make_grid, warp
+from src.models.tupann.autoenc_lightning import model as AutoencoderKL
+from src.models.tupann.utils import make_grid, warp
 
-# from src.models.nowcastrio.mamba_parts.vmamba import VSSM
 from src.utils.lightning_utils import transform_multiple_loc
 
 scheduler_dict = {
@@ -51,7 +50,8 @@ class model(LModule):
         train_autoenc: bool = False,
         **kwargs,
     ):
-        true_target_dict = {list(target_shape_dict.keys())[0]: target_shape_dict[list(target_shape_dict.keys())[0]]}
+        true_target_dict = {list(target_shape_dict.keys())[
+            0]: target_shape_dict[list(target_shape_dict.keys())[0]]}
         super().__init__(
             input_shape_dict,
             true_target_dict,
@@ -62,7 +62,7 @@ class model(LModule):
             loss=loss,
             xmax=xmax,
             weights=weights,
-            learning_rate =learning_rate,
+            learning_rate=learning_rate,
             lead_time_cond=lead_time_cond,
             **kwargs,
         )
@@ -77,13 +77,15 @@ class model(LModule):
         self.maxvit_downsample = maxvit_downsample
         self.scheduler_params = scheduler_params
 
-        self.img_size = target_shape_dict[list(target_shape_dict.keys())[0]][-1]
+        self.img_size = target_shape_dict[list(
+            target_shape_dict.keys())[0]][-1]
         # self.target_length = target_shape[0]
-        self.input_length = input_shape_dict[list(input_shape_dict.keys())[0]][0]
+        self.input_length = input_shape_dict[list(
+            input_shape_dict.keys())[0]][0]
 
         self.automatic_optimization = False
         self.val_loss_steps = []
-        self.name = "nowcastrio"
+        self.name = "tupann"
 
         input_shape_dict_autoenc = input_shape_dict
 
@@ -93,15 +95,18 @@ class model(LModule):
 
         # load autoencoder
         if autoenc_ckpt is not None:
-            autoencoder_path = "models/nowcastrio_autoenc/" + autoenc_hash + "/train/" + dataset + "/" + autoenc_ckpt
+            autoencoder_path = "models/tupann_autoenc/" + \
+                autoenc_hash + "/train/" + dataset + "/" + autoenc_ckpt
         else:
-            autoencoder_path = "models/nowcastrio_autoenc/" + autoenc_hash + "/train/" + dataset + "/model_train.pt"
+            autoencoder_path = "models/tupann_autoenc/" + \
+                autoenc_hash + "/train/" + dataset + "/model_train.pt"
         with open(pathlib.Path(autoencoder_path).parent / "h_params.yaml") as f:
             params = yaml.safe_load(f)
         # To match the train target length used in the autoencoder
         dummy_val = torch.zeros(1, self.img_size, self.img_size)
         # if we use the latent
-        val_autoencoder_dict = {list(target_shape_dict.keys())[-1]: dummy_val.shape}
+        val_autoencoder_dict = {
+            list(target_shape_dict.keys())[-1]: dummy_val.shape}
 
         if not self.train_autoenc:
             autoencoder = AutoencoderKL(
@@ -123,7 +128,8 @@ class model(LModule):
             )
         except RuntimeError:
             autoencoder.load_state_dict(
-                torch.load(autoencoder_path, map_location=self.device, weights_only=False)["state_dict"], strict=True
+                torch.load(autoencoder_path, map_location=self.device,
+                           weights_only=False)["state_dict"], strict=True
             )
 
         self.add_module("autoencoder", autoencoder)
@@ -158,14 +164,16 @@ class model(LModule):
             **self.maxvitparams,
         )
 
-        self.register_buffer("weight_time_decay", torch.ones((self.target_length_val), device=self.device))
+        self.register_buffer("weight_time_decay", torch.ones(
+            (self.target_length_val), device=self.device))
 
     def forward(self, x, x_ini, lead_time=None, transform=None, inv_transform=None):
         grid = self.grid.repeat(x.shape[0], 1, 1, 1)
         current_image = x_ini
 
         future_image = None
-        out = torch.empty((x.shape[0], self.target_length, x.shape[-1], x.shape[-1]), device=self.device)
+        out = torch.empty(
+            (x.shape[0], self.target_length, x.shape[-1], x.shape[-1]), device=self.device)
 
         first_latent_field = self.autoencoder.encode(x).sample()
 
@@ -174,10 +182,12 @@ class model(LModule):
         future_latent_fields = self.latent_model(latent, lead_time)
 
         latent_decoded = self.autoencoder.decode(future_latent_fields)
-        field_pred, intensity_pred = torch.tensor_split(latent_decoded, (2), dim=1)
+        field_pred, intensity_pred = torch.tensor_split(
+            latent_decoded, (2), dim=1)
 
         future_image = (
-            warp(inv_transform(current_image), field_pred, grid, padding_mode="zeros", fill_value=0) + intensity_pred
+            warp(inv_transform(current_image), field_pred, grid,
+                 padding_mode="zeros", fill_value=0) + intensity_pred
         )
         future_image = transform(future_image)
 
@@ -191,14 +201,17 @@ class model(LModule):
         current_image = x_ini
 
         future_image = None
-        out = torch.empty((x.shape[0], self.target_length_val, x.shape[-1], x.shape[-1]), device=self.device)
+        out = torch.empty(
+            (x.shape[0], self.target_length_val, x.shape[-1], x.shape[-1]), device=self.device)
 
         first_latent_field = self.autoencoder.encode(x).sample()
 
         latent_decoded = self.autoencoder.decode(first_latent_field)
-        field_pred, intensity_pred = torch.tensor_split(latent_decoded, (2), dim=1)
+        field_pred, intensity_pred = torch.tensor_split(
+            latent_decoded, (2), dim=1)
         future_image = (
-            warp(inv_transform(current_image), field_pred, grid, padding_mode="zeros", fill_value=0) + intensity_pred
+            warp(inv_transform(current_image), field_pred, grid,
+                 padding_mode="zeros", fill_value=0) + intensity_pred
         )
         future_image = transform(future_image)
         current_image = future_image
@@ -206,14 +219,18 @@ class model(LModule):
 
         for i in range(1, self.target_length_val):
             lead_time = torch.Tensor([i - 1]).int()
-            lead_time = repeat(lead_time, "c -> b c", b=x.shape[0]).to(device=self.device)
+            lead_time = repeat(lead_time, "c -> b c",
+                               b=x.shape[0]).to(device=self.device)
             # lead_time = torch.ones((x.shape[0]), device=self.device, dtype=torch.int) * int(i)
-            future_latent_fields = self.latent_model(first_latent_field, lead_time)  # Reshape the i
+            future_latent_fields = self.latent_model(
+                first_latent_field, lead_time)  # Reshape the i
 
             latent_decoded = self.autoencoder.decode(future_latent_fields)
-            field_pred, intensity_pred = torch.tensor_split(latent_decoded, (2), dim=1)
+            field_pred, intensity_pred = torch.tensor_split(
+                latent_decoded, (2), dim=1)
             future_image = (
-                warp(inv_transform(current_image), field_pred, grid, padding_mode="zeros", fill_value=0)
+                warp(inv_transform(current_image), field_pred,
+                     grid, padding_mode="zeros", fill_value=0)
                 + intensity_pred
             )
             future_image = transform(future_image)
@@ -228,7 +245,8 @@ class model(LModule):
         train_loss_func = self.train_loss().to(self.device)
 
         loss = train_loss_func(image_pred, x_after)
-        self.log(split + "_loss", loss, prog_bar=True, on_epoch=True, sync_dist=True)
+        self.log(split + "_loss", loss, prog_bar=True,
+                 on_epoch=True, sync_dist=True)
 
         return loss
 
@@ -249,14 +267,16 @@ class model(LModule):
 
         def loc_transform(t):
             return torch.cat(
-                [self.transforms[list(Y_dict.keys())[0]][locations[i]](t[i]).unsqueeze(0) for i in range(t.shape[0])],
+                [self.transforms[list(Y_dict.keys())[0]][locations[i]](
+                    t[i]).unsqueeze(0) for i in range(t.shape[0])],
                 dim=0,
             )
 
         def loc_inv_transform(t):
             return torch.cat(
                 [
-                    self.inv_transforms[list(Y_dict.keys())[0]][locations[i]](t[i]).unsqueeze(0)
+                    self.inv_transforms[list(Y_dict.keys())[0]][locations[i]](
+                        t[i]).unsqueeze(0)
                     for i in range(t.shape[0])
                 ],
                 dim=0,
@@ -267,7 +287,8 @@ class model(LModule):
 
         lead_time = batch[2]
         x_ini = Y[:, 0][:, None, :, :]
-        pred = self(X, x_ini, lead_time, transform=loc_transform, inv_transform=loc_inv_transform)
+        pred = self(X, x_ini, lead_time, transform=loc_transform,
+                    inv_transform=loc_inv_transform)
         Y = Y[:, 1][:, None, :, :]
 
         train_loss = self.compute_loss(
@@ -293,17 +314,21 @@ class model(LModule):
         if self.optim == "adam":
             optimizer = torch.optim.Adam(parameters, lr=self.lr)
             if self.train_autoenc:
-                optimizer_autoenc = torch.optim.Adam(self.autoencoder.parameters(), lr=0.001 * self.lr)
+                optimizer_autoenc = torch.optim.Adam(
+                    self.autoencoder.parameters(), lr=0.001 * self.lr)
                 optimizers.append(optimizer_autoenc)
-                scheduler_autoenc = fetch_scheduler(self.scheduler_params)(optimizer_autoenc)
+                scheduler_autoenc = fetch_scheduler(
+                    self.scheduler_params)(optimizer_autoenc)
                 schedulers.append(scheduler_autoenc)
 
         elif self.optim == "adamw":
             optimizer = torch.optim.AdamW(parameters, lr=self.lr)
             if self.train_autoenc:
-                optimizer_autoenc = torch.optim.AdamW(self.autoencoder.parameters(), lr=0.001 * self.lr)
+                optimizer_autoenc = torch.optim.AdamW(
+                    self.autoencoder.parameters(), lr=0.001 * self.lr)
                 optimizers.append(optimizer_autoenc)
-                scheduler_autoenc = fetch_scheduler(self.scheduler_params)(optimizer_autoenc)
+                scheduler_autoenc = fetch_scheduler(
+                    self.scheduler_params)(optimizer_autoenc)
                 schedulers.append(scheduler_autoenc)
 
         scheduler = fetch_scheduler(self.scheduler_params)(optimizer)
@@ -322,14 +347,16 @@ class model(LModule):
 
         def loc_transform(t):
             return torch.cat(
-                [self.transforms[list(Y_dict.keys())[0]][locations[i]](t[i]).unsqueeze(0) for i in range(t.shape[0])],
+                [self.transforms[list(Y_dict.keys())[0]][locations[i]](
+                    t[i]).unsqueeze(0) for i in range(t.shape[0])],
                 dim=0,
             )
 
         def loc_inv_transform(t):
             return torch.cat(
                 [
-                    self.inv_transforms[list(Y_dict.keys())[0]][locations[i]](t[i]).unsqueeze(0)
+                    self.inv_transforms[list(Y_dict.keys())[0]][locations[i]](
+                        t[i]).unsqueeze(0)
                     for i in range(t.shape[0])
                 ],
                 dim=0,
@@ -337,7 +364,8 @@ class model(LModule):
 
         x_ini = X[:, -1][:, None, :, :]
 
-        pred = self.forward_lead_time_all(X, x_ini, transform=loc_transform, inv_transform=loc_inv_transform)
+        pred = self.forward_lead_time_all(
+            X, x_ini, transform=loc_transform, inv_transform=loc_inv_transform)
         _ = self.compute_loss(pred, Y, "val")
 
         pred_dict = {list(Y_dict.keys())[0]: pred}
@@ -352,14 +380,16 @@ class model(LModule):
 
         def loc_transform(t):
             return torch.cat(
-                [self.transforms[list(y_dict.keys())[0]][locations[i]](t[i]).unsqueeze(0) for i in range(t.shape[0])],
+                [self.transforms[list(y_dict.keys())[0]][locations[i]](
+                    t[i]).unsqueeze(0) for i in range(t.shape[0])],
                 dim=0,
             )
 
         def loc_inv_transform(t):
             return torch.cat(
                 [
-                    self.inv_transforms[list(y_dict.keys())[0]][locations[i]](t[i]).unsqueeze(0)
+                    self.inv_transforms[list(y_dict.keys())[0]][locations[i]](
+                        t[i]).unsqueeze(0)
                     for i in range(t.shape[0])
                 ],
                 dim=0,
@@ -372,7 +402,8 @@ class model(LModule):
 
         x_ini = x_before[:, -1][:, None, :, :]
 
-        pred = self.forward_lead_time_all(x_before, x_ini, transform=loc_transform, inv_transform=loc_inv_transform)
+        pred = self.forward_lead_time_all(
+            x_before, x_ini, transform=loc_transform, inv_transform=loc_inv_transform)
 
         y_hat = {
             list(y_dict.keys())[0]: pred,
@@ -387,8 +418,10 @@ class model(LModule):
                 y_hat_trans[key] = transformation[location](y_hat[key])
                 y_trans[key] = transformation[location](y_dict[key])
             else:
-                y_hat_trans[key] = transform_multiple_loc(transformation, y_hat[key], locations)
-                y_trans[key] = transform_multiple_loc(transformation, y_dict[key], locations)
+                y_hat_trans[key] = transform_multiple_loc(
+                    transformation, y_hat[key], locations)
+                y_trans[key] = transform_multiple_loc(
+                    transformation, y_dict[key], locations)
         if update_metrics:
             self.eval_metrics_agg.update(
                 target=y_trans[list(y_dict.keys())[0]][:, :, None],

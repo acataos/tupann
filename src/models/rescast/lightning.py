@@ -9,8 +9,8 @@ from einops import rearrange
 from torch.optim.lr_scheduler import LambdaLR
 
 from src.models.lightning import LModule
-from src.models.nowcastrio.autoenc_lightning import model as AutoencoderKL
-from src.models.nowcastrio.utils import make_grid, warp
+from src.models.tupann.autoenc_lightning import model as AutoencoderKL
+from src.models.tupann.utils import make_grid, warp
 from src.models.rescast.resnet_module import ResNetNowcasting
 from src.utils.lightning_utils import FIELDS_INTENSITIES_KEY_OPTIONS, transform_multiple_loc
 
@@ -70,7 +70,8 @@ class model(LModule):
             inv_transforms: Inverse transforms
         """
         # Extract first target for parent initialization
-        true_target_dict = {list(target_shape_dict.keys())[0]: target_shape_dict[list(target_shape_dict.keys())[0]]}
+        true_target_dict = {list(target_shape_dict.keys())[
+            0]: target_shape_dict[list(target_shape_dict.keys())[0]]}
 
         super().__init__(
             input_shape_dict,
@@ -97,9 +98,12 @@ class model(LModule):
         self.fields_intensities_key = None
 
         # Extract dimensions
-        self.img_size = target_shape_dict[list(target_shape_dict.keys())[0]][-1]
-        self.input_length = input_shape_dict[list(input_shape_dict.keys())[0]][0]
-        self.target_length = target_shape_dict[list(target_shape_dict.keys())[0]][0]
+        self.img_size = target_shape_dict[list(
+            target_shape_dict.keys())[0]][-1]
+        self.input_length = input_shape_dict[list(
+            input_shape_dict.keys())[0]][0]
+        self.target_length = target_shape_dict[list(
+            target_shape_dict.keys())[0]][0]
 
         # Check if we have latent input (2 keys) or just image input (1 key)
         if len(list(input_shape_dict.keys())) == 2:
@@ -107,17 +111,20 @@ class model(LModule):
         elif len(list(input_shape_dict.keys())) == 1:
             self.add_latent = False
         else:
-            raise ValueError("Input shape dictionary should have 1 or 2 keys, " f"got {len(input_shape_dict.keys())}")
+            raise ValueError(
+                "Input shape dictionary should have 1 or 2 keys, " f"got {len(input_shape_dict.keys())}")
 
         # Set up autoencoder input shape
         if self.add_latent:
             input_autoencoder = torch.zeros(9, self.img_size, self.img_size)
-            input_shape_dict_autoenc = {list(input_shape_dict.keys())[0]: input_autoencoder.shape}
+            input_shape_dict_autoenc = {list(input_shape_dict.keys())[
+                0]: input_autoencoder.shape}
         else:
             input_shape_dict_autoenc = input_shape_dict
 
         # Load autoencoder
-        self._load_autoencoder(autoenc_hash, autoenc_ckpt, dataset, input_shape_dict_autoenc, true_target_dict)
+        self._load_autoencoder(autoenc_hash, autoenc_ckpt,
+                               dataset, input_shape_dict_autoenc, true_target_dict)
 
         # Create grid for warping operations
         sample_tensor = torch.zeros(1, 1, self.img_size, self.img_size)
@@ -140,9 +147,9 @@ class model(LModule):
         """Load and setup the pretrained autoencoder."""
         # Construct autoencoder path
         if autoenc_ckpt is not None:
-            autoencoder_path = f"models/nowcastrio_autoenc/{autoenc_hash}/train/" f"{dataset}/{autoenc_ckpt}"
+            autoencoder_path = f"models/tupann_autoenc/{autoenc_hash}/train/" f"{dataset}/{autoenc_ckpt}"
         else:
-            autoencoder_path = f"models/nowcastrio_autoenc/{autoenc_hash}/train/" f"{dataset}/model_train.pt"
+            autoencoder_path = f"models/tupann_autoenc/{autoenc_hash}/train/" f"{dataset}/model_train.pt"
 
         # Load autoencoder hyperparameters
         with open(pathlib.Path(autoencoder_path).parent / "h_params.yaml") as f:
@@ -150,7 +157,8 @@ class model(LModule):
 
         # Create validation target dict for autoencoder
         dummy_val = torch.zeros(1, self.img_size, self.img_size)
-        val_autoencoder_dict = {list(true_target_dict.keys())[-1]: dummy_val.shape}
+        val_autoencoder_dict = {
+            list(true_target_dict.keys())[-1]: dummy_val.shape}
 
         # Initialize autoencoder
         autoencoder = AutoencoderKL(
@@ -168,7 +176,8 @@ class model(LModule):
         except Exception as e:
             print(f"Direct ckpt load failed: {e}, trying to load state dict")
             autoencoder.load_state_dict(
-                torch.load(autoencoder_path, map_location=self.device, weights_only=False)["state_dict"], strict=True
+                torch.load(autoencoder_path, map_location=self.device,
+                           weights_only=False)["state_dict"], strict=True
             )
         autoencoder = autoencoder.requires_grad_(False)
         autoencoder.eval()
@@ -192,8 +201,10 @@ class model(LModule):
         grid = self.grid.repeat(batch_size, 1, 1, 1)
 
         # Initialize output tensors
-        out = torch.empty((batch_size, self.target_length, x.shape[-1], x.shape[-1]), device=self.device)
-        out_intensities = torch.empty((batch_size, self.target_length, 1, x.shape[-1], x.shape[-1]), device=self.device)
+        out = torch.empty((batch_size, self.target_length,
+                          x.shape[-1], x.shape[-1]), device=self.device)
+        out_intensities = torch.empty(
+            (batch_size, self.target_length, 1, x.shape[-1], x.shape[-1]), device=self.device)
         out_motion_field = torch.empty(
             (batch_size, self.target_length, 2, x.shape[-1], x.shape[-1]), device=self.device
         )
@@ -217,12 +228,14 @@ class model(LModule):
 
             # Decode latent to motion field and intensity
             decoded = self.autoencoder.decode(latent_t)
-            field_pred, intensity_pred = torch.tensor_split(decoded, (2,), dim=1)
+            field_pred, intensity_pred = torch.tensor_split(
+                decoded, (2,), dim=1)
 
             # Apply motion field to current image
             with torch.no_grad():
                 future_image = transform(
-                    warp(inv_transform(current_image), field_pred, grid, padding_mode="zeros", fill_value=0)
+                    warp(inv_transform(current_image), field_pred,
+                         grid, padding_mode="zeros", fill_value=0)
                     + intensity_pred
                 )
 
@@ -257,14 +270,16 @@ class model(LModule):
         # Location-specific transforms
         def loc_transform(t):
             return torch.cat(
-                [self.transforms[list(Y_dict.keys())[0]][locations[i]](t[i]).unsqueeze(0) for i in range(t.shape[0])],
+                [self.transforms[list(Y_dict.keys())[0]][locations[i]](
+                    t[i]).unsqueeze(0) for i in range(t.shape[0])],
                 dim=0,
             )
 
         def loc_inv_transform(t):
             return torch.cat(
                 [
-                    self.inv_transforms[list(Y_dict.keys())[0]][locations[i]](t[i]).unsqueeze(0)
+                    self.inv_transforms[list(Y_dict.keys())[0]][locations[i]](
+                        t[i]).unsqueeze(0)
                     for i in range(t.shape[0])
                 ],
                 dim=0,
@@ -284,7 +299,8 @@ class model(LModule):
                     self.fields_intensities_key = option
                     break
             if self.fields_intensities_key is None:
-                raise ValueError("No valid key for motion fields and intensities found in target dictionary.")
+                raise ValueError(
+                    "No valid key for motion fields and intensities found in target dictionary.")
             motion_field_truth = Y_dict[self.fields_intensities_key][:, :, :2]
             intensities_truth = Y_dict[self.fields_intensities_key][:, :, 2]
 
@@ -347,11 +363,13 @@ class model(LModule):
 
             # Decode latent to motion field and intensity
             decoded = self.autoencoder.decode(latent_t)
-            field_pred, intensity_pred = torch.tensor_split(decoded, (2,), dim=1)
+            field_pred, intensity_pred = torch.tensor_split(
+                decoded, (2,), dim=1)
 
             # Apply motion field to current image
             future_image = loc_transform(
-                warp(loc_inv_transform(current_image), field_pred, grid, padding_mode="zeros", fill_value=0)
+                warp(loc_inv_transform(current_image), field_pred,
+                     grid, padding_mode="zeros", fill_value=0)
                 + intensity_pred
             )
 
@@ -375,7 +393,8 @@ class model(LModule):
         sch.step()
 
         # Compute loss
-        self.log("train_loss", total_loss, prog_bar=True, on_epoch=True, sync_dist=True)
+        self.log("train_loss", total_loss, prog_bar=True,
+                 on_epoch=True, sync_dist=True)
 
     def validation_step(self, batch, batch_idx):
         """Validation step."""
@@ -386,14 +405,16 @@ class model(LModule):
         # Location-specific transforms
         def loc_transform(t):
             return torch.cat(
-                [self.transforms[list(Y_dict.keys())[0]][locations[i]](t[i]).unsqueeze(0) for i in range(t.shape[0])],
+                [self.transforms[list(Y_dict.keys())[0]][locations[i]](
+                    t[i]).unsqueeze(0) for i in range(t.shape[0])],
                 dim=0,
             )
 
         def loc_inv_transform(t):
             return torch.cat(
                 [
-                    self.inv_transforms[list(Y_dict.keys())[0]][locations[i]](t[i]).unsqueeze(0)
+                    self.inv_transforms[list(Y_dict.keys())[0]][locations[i]](
+                        t[i]).unsqueeze(0)
                     for i in range(t.shape[0])
                 ],
                 dim=0,
@@ -413,7 +434,8 @@ class model(LModule):
                     self.fields_intensities_key = option
                     break
             if self.fields_intensities_key is None:
-                raise ValueError("No valid key for motion fields and intensities found in target dictionary.")
+                raise ValueError(
+                    "No valid key for motion fields and intensities found in target dictionary.")
             motion_fields_truth = Y_dict[self.fields_intensities_key][:, :, :2]
             intensities_truth = Y_dict[self.fields_intensities_key][:, :, 2]
 
@@ -423,20 +445,24 @@ class model(LModule):
             latent_truth = Y_dict[list(Y_dict.keys())[2]][:, :-1]
         else:
             latent_ini = None
-            latent_truth = torch.zeros((Y.shape[0], 2, Y.shape[-1], Y.shape[-1], Y.shape[1])).cuda()
+            latent_truth = torch.zeros(
+                (Y.shape[0], 2, Y.shape[-1], Y.shape[-1], Y.shape[1])).cuda()
             latent_truth = rearrange(latent_truth, "b c x y na -> b na c x y")
 
         # Set initial frame
         x_ini = X[:, -1][:, None, :, :]
 
         # Forward pass
-        pred = self(X, x_ini, latent_ini, transform=loc_transform, inv_transform=loc_inv_transform)
+        pred = self(X, x_ini, latent_ini, transform=loc_transform,
+                    inv_transform=loc_inv_transform)
 
         # Compute validation loss
-        _ = self.compute_loss(pred, Y, motion_fields_truth, intensities_truth, latent_truth, "val")
+        _ = self.compute_loss(pred, Y, motion_fields_truth,
+                              intensities_truth, latent_truth, "val")
 
         # Return predictions in expected format
-        pred_dict = {list(Y_dict.keys())[0]: pred[0], list(Y_dict.keys())[1]: torch.cat((pred[2], pred[1]), dim=2)}
+        pred_dict = {list(Y_dict.keys())[0]: pred[0], list(Y_dict.keys())[
+            1]: torch.cat((pred[2], pred[1]), dim=2)}
         if self.add_latent:
             pred_dict[list(Y_dict.keys())[2]] = pred[3]
 
@@ -464,14 +490,16 @@ class model(LModule):
 
         def loc_transform(t):
             return torch.cat(
-                [self.transforms[list(y_dict.keys())[0]][locations[i]](t[i]).unsqueeze(0) for i in range(t.shape[0])],
+                [self.transforms[list(y_dict.keys())[0]][locations[i]](
+                    t[i]).unsqueeze(0) for i in range(t.shape[0])],
                 dim=0,
             )
 
         def loc_inv_transform(t):
             return torch.cat(
                 [
-                    self.inv_transforms[list(y_dict.keys())[0]][locations[i]](t[i]).unsqueeze(0)
+                    self.inv_transforms[list(y_dict.keys())[0]][locations[i]](
+                        t[i]).unsqueeze(0)
                     for i in range(t.shape[0])
                 ],
                 dim=0,
@@ -484,10 +512,12 @@ class model(LModule):
         x_before = X_dict[list(X_dict.keys())[0]].to(self.device)
         if len(list(X_dict.keys())) == 1:
             latent_ini = None
-            latent_truth = torch.zeros((Y.shape[0], 2, Y.shape[-1], Y.shape[-1], Y.shape[1])).cuda()
+            latent_truth = torch.zeros(
+                (Y.shape[0], 2, Y.shape[-1], Y.shape[-1], Y.shape[1])).cuda()
             latent_truth = rearrange(latent_truth, "b c x y na -> b na c x y")
         else:
-            latent_ini = X_dict[list(X_dict.keys())[1]].squeeze().to(self.device)
+            latent_ini = X_dict[list(X_dict.keys())[1]
+                                ].squeeze().to(self.device)
             latent_truth = y_dict[list(y_dict.keys())[2]][:, :-1]
 
         if latent_ini is None:
@@ -519,8 +549,10 @@ class model(LModule):
                 y_hat_trans[key] = transformation[location](y_hat[key])
                 y_trans[key] = transformation[location](y_dict[key])
             else:
-                y_hat_trans[key] = transform_multiple_loc(transformation, y_hat[key], locations)
-                y_trans[key] = transform_multiple_loc(transformation, y_dict[key], locations)
+                y_hat_trans[key] = transform_multiple_loc(
+                    transformation, y_hat[key], locations)
+                y_trans[key] = transform_multiple_loc(
+                    transformation, y_dict[key], locations)
 
         if update_metrics:
             self.eval_metrics.update(

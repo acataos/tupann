@@ -57,7 +57,7 @@ metrics_by_data = {
         "l1_loss": {"log": True, "function": torch.nn.L1Loss()},
         "l2_loss": {"log": True, "function": torch.nn.MSELoss()},
     },
-    "nowcastrio_autoenc": {
+    "tupann_autoenc": {
         "l1_loss": {"log": True, "function": torch.nn.L1Loss()},
         "l2_loss": {"log": True, "function": torch.nn.MSELoss()},
     },
@@ -236,7 +236,7 @@ class LModule(LightningModule):
         n_locations = len(set(locations)) if isinstance(locations, list) else 1
         y_hat = outputs
         for target in y_hat.keys():
-            if target == "nowcastrio_autoenc":
+            if target == "tupann_autoenc":
                 y[target] = y[target][:, :-1]
             for key in self.inv_transforms.keys():
                 if target in key:
@@ -407,7 +407,7 @@ class LModule(LightningModule):
         y_hat = self.predict_step(
             batch, 0, update_metrics=False, return_full=True)
         for key in y_hat.keys():
-            if key == "nowcastrio_autoenc":
+            if key == "tupann_autoenc":
                 continue
             if n_locations == 1:
                 location = locations[0]
