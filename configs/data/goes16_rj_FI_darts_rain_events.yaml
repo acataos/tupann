@@ -1,0 +1,22 @@
+input:
+  goes16_rrqpe:
+    lags: [-80,-70,-60,-50,-40,-30,-20,-10, 0]
+    transform: standardize
+target:
+  fields_intensities#goes16_rrqpe#darts:
+    lags: [0]
+  goes16_rrqpe:
+    lags: [10]
+    transform: standardize
+
+train:
+  locations: ["rio_de_janeiro"]
+  datetimes: "configs/data/train_FI_datetimes-goes16_rrqpe-rj_small.txt"
+
+val:
+  locations: ["rio_de_janeiro"]
+  datetimes: "configs/data/val_FI_datetimes-goes16_rrqpe-rj_small.txt"
+
+test:
+  locations: ["rio_de_janeiro"]
+  datetimes: "configs/data/test_FI_datetimes-goes16_rrqpe-rj_small.txt"

@@ -1,0 +1,5 @@
+save_top: 5
+monitored_loss: CSI8
+# train_idx: [380,13580,34172]
+train_idx: [0,1,2]
+val_idx:  [0,1,2]

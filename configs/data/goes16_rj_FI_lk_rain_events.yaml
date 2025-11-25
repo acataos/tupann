@@ -1,0 +1,22 @@
+input:
+  goes16_rrqpe_rain_events:
+    lags: [-80,-70,-60,-50,-40,-30,-20,-10, 0]
+    transform: standardize
+target:
+  fields_intensities_rain_events#goes16_rrqpe_rain_events#lk:
+    lags: [0]
+  goes16_rrqpe_rain_events:
+    lags: [10]
+    transform: standardize
+
+train:
+  locations: ["rj"]
+  datetimes: "configs/data/train_FI_datetimes-goes16_rrqpe-rj-thr=120000-tr=24.txt"
+
+val:
+  locations: ["rj"]
+  datetimes: "configs/data/val_FI_datetimes-goes16_rrqpe-rj-thr=120000-tr=24.txt"
+
+test:
+  locations: ["rj"]
+  datetimes: "configs/data/test_FI_datetimes-goes16_rrqpe-rj-thr=120000-tr=24.txt"

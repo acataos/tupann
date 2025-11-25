@@ -1,0 +1,12 @@
+batch_size: 8
+channels: 128
+cos_weight: 0.33
+dropout: 0.2
+embed_dim: 4
+kl_weight: 1.0e-06
+learning_rate: 0.0001
+model_name: tupann_autoenc
+n_epochs: 100
+n_fields: 1
+reduc_factor: 4
+vector_weight: 0.005
