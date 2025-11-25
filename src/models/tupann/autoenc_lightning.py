@@ -32,7 +32,6 @@ class model(LModule):
         lanbda_: float = 0.0,
         channels=64,
         dropout=0.0,
-        image_loss=False,
         n_fields=1,
         lead_time_cond: int = 0,
         predict_latent: bool = False,
@@ -47,7 +46,6 @@ class model(LModule):
         )
         self.automatic_optimization = False
         self.lr = learning_rate
-        self.image_loss = image_loss
         self.loss_weight = cos_weight
         self.cos_loss = torch.nn.CosineSimilarity(dim=2, eps=1e-08)
         self.reduc_factor = reduc_factor
@@ -146,8 +144,6 @@ class model(LModule):
         intensities_real,
         reconstructions,
         posteriors,
-        last_image=None,
-        image_real=None,
         split="train",
     ):
         kl_loss = posteriors.kl()
@@ -163,63 +159,20 @@ class model(LModule):
             (1.0 - self.loss_weight) * l1_vector
         rec_loss_intensities = l1_intensities
 
-        # If we want to use the evolution network loss.
-        if self.image_loss and image_real is not None:
-            image_pred = warp(
-                last_image,
-                field_pred,
-                self.grid.repeat(last_image.shape[0], 1, 1, 1),
-                padding_mode="zeros",
-                fill_value=0,
-            ) + intensity_pred.unsqueeze(1)
-            v1 = field_pred[:, :1, :, :]
-            v2 = field_pred[:, 1:, :, :]
-            dv1x = F.conv2d(v1, self.g1.to(self.device), padding=1)
-            dv1y = F.conv2d(v1, self.g2.to(self.device), padding=1)
-            dv2x = F.conv2d(v2, self.g1.to(self.device), padding=1)
-            dv2y = F.conv2d(v2, self.g2.to(self.device), padding=1)
+        loss = (
+            self.vector_weight * rec_loss_vector
+            + (1 - self.vector_weight) * rec_loss_intensities
+            + self.kl_weight * kl_loss
+        )
 
-            loss = (
-                (1 - self.future_image_loss)
-                * (self.vector_weight * rec_loss_vector + (1 - self.vector_weight) * rec_loss_intensities)
-                + self.future_image_loss *
-                torch.abs(image_real - image_pred).mean()
-                + self.kl_weight * kl_loss
-                + self.lambda_ *
-                torch.mean((torch.pow(dv1x, 2) + torch.pow(dv1y, 2)))
-                + self.lambda_ *
-                torch.mean((torch.pow(dv2x, 2) + torch.pow(dv2y, 2)))
-            )
-            log = {
-                "{}/total_loss".format(split): loss.detach().mean(),
-                "{}/kl_loss".format(split): kl_loss.detach().mean(),
-                "{}/rec_loss_vector".format(split): rec_loss_vector.detach().mean(),
-                "{}/l1_vector".format(split): l1_vector.detach().mean(),
-                "{}/rec_loss_image".format(split): torch.abs(image_real - image_pred).mean(),
-                "{}/cossim".format(split): cossim.detach().mean(),
-                "{}/rec_loss_intensities".format(split): rec_loss_intensities.detach().mean(),
-                "{}/vector_regularization".format(split): torch.mean(
-                    (torch.pow(dv1x, 2) + torch.pow(dv1y, 2)) +
-                    (torch.pow(dv2x, 2) + torch.pow(dv2y, 2))
-                )
-                .detach()
-                .mean(),
-            }
-        else:
-            loss = (
-                self.vector_weight * rec_loss_vector
-                + (1 - self.vector_weight) * rec_loss_intensities
-                + self.kl_weight * kl_loss
-            )
-
-            log = {
-                "{}/total_loss".format(split): loss.detach().mean(),
-                "{}/kl_loss".format(split): kl_loss.detach().mean(),
-                "{}/rec_loss_vector".format(split): rec_loss_vector.detach().mean(),
-                "{}/l1_vector".format(split): l1_vector.detach().mean(),
-                "{}/cossim".format(split): cossim.detach().mean(),
-                "{}/rec_loss_intensities".format(split): rec_loss_intensities.detach().mean(),
-            }
+        log = {
+            "{}/total_loss".format(split): loss.detach().mean(),
+            "{}/kl_loss".format(split): kl_loss.detach().mean(),
+            "{}/rec_loss_vector".format(split): rec_loss_vector.detach().mean(),
+            "{}/l1_vector".format(split): l1_vector.detach().mean(),
+            "{}/cossim".format(split): cossim.detach().mean(),
+            "{}/rec_loss_intensities".format(split): rec_loss_intensities.detach().mean(),
+        }
         return loss, log
 
     def loss_val(
@@ -273,32 +226,11 @@ class model(LModule):
         opt_ae = self.optimizers()
         sch = self.lr_schedulers()
 
-        # Obtain the transformations need when we train using the images.
-        if self.image_loss:
-            metadata = batch[3]
-            locations = metadata["location"]
-
-            def loc_inv_transform(t):
-                return torch.cat(
-                    [
-                        self.inv_transforms[list(Y.keys())[1]][locations[i]](
-                            t[i]).unsqueeze(0)
-                        for i in range(t.shape[0])
-                    ],
-                    dim=0,
-                )
-
-            x_ini = input[:, -1][:, None, :, :]
-            image_real = loc_inv_transform(Y[list(Y.keys())[1]])
-            last_image = loc_inv_transform(x_ini)
-        else:
-            image_real = None
-            last_image = None
 
         self.toggle_optimizer(opt_ae)
 
         aeloss, log_dict_ae = self.loss(
-            motion_fields, intensities, reconstructions, posterior, last_image, image_real, split="train"
+            motion_fields, intensities, reconstructions, posterior, split="train"
         )
 
         self.log_dict(
