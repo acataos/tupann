@@ -53,21 +53,11 @@ metrics_by_data = {
         **TP_dict,
         **DEN_dict,
     },
-    "goes16_rrqpe_rain_events": {
-        "l1_loss": {"log": True, "function": torch.nn.L1Loss()},
-        "l2_loss": {"log": True, "function": torch.nn.MSELoss()},
-        **TP_dict,
-        **DEN_dict,
-    },
     "fields_intensities": {
         "l1_loss": {"log": True, "function": torch.nn.L1Loss()},
         "l2_loss": {"log": True, "function": torch.nn.MSELoss()},
     },
     "nowcastrio_autoenc": {
-        "l1_loss": {"log": True, "function": torch.nn.L1Loss()},
-        "l2_loss": {"log": True, "function": torch.nn.MSELoss()},
-    },
-    "fields_intensities_rain_events": {
         "l1_loss": {"log": True, "function": torch.nn.L1Loss()},
         "l2_loss": {"log": True, "function": torch.nn.MSELoss()},
     },
@@ -122,7 +112,8 @@ class LModule(LightningModule):
         # self.csi_option = torch.tensor([16, 74, 133, 160, 181, 219])
 
         self.compute_csi = False
-        self.register_buffer("CSI", torch.zeros((2 * len(CSI_THR), self.target_length_val)))
+        self.register_buffer("CSI", torch.zeros(
+            (2 * len(CSI_THR), self.target_length_val)))
         self.show_im = 1
         self.xmax = xmax
 
@@ -196,7 +187,8 @@ class LModule(LightningModule):
                 on_epoch=True,
                 sync_dist=True,
             )
-            self.log("train_loss", train_loss, prog_bar=True, on_epoch=True, sync_dist=True)
+            self.log("train_loss", train_loss, prog_bar=True,
+                     on_epoch=True, sync_dist=True)
         return train_loss
 
     def validation_step(self, batch, batch_idx):
@@ -218,7 +210,8 @@ class LModule(LightningModule):
         train_loss_f = self.train_loss()
         val_loss = train_loss_f(y_hat * weights, y * weights)
 
-        self.log("val_loss", val_loss, prog_bar=True, on_epoch=True, sync_dist=True)
+        self.log("val_loss", val_loss, prog_bar=True,
+                 on_epoch=True, sync_dist=True)
         return {list(y_dict.keys())[0]: y_hat}
 
     def on_train_epoch_start(self) -> None:
@@ -248,11 +241,15 @@ class LModule(LightningModule):
                     inv_transform_key = key  # Assuming the key is unique for each target
             if n_locations == 1:
                 location = locations[0]
-                y_hat_trans = self.inv_transforms[inv_transform_key][location](y_hat[target])
-                y_trans = self.inv_transforms[inv_transform_key][location](y[target])
+                y_hat_trans = self.inv_transforms[inv_transform_key][location](
+                    y_hat[target])
+                y_trans = self.inv_transforms[inv_transform_key][location](
+                    y[target])
             else:
-                y_hat_trans = transform_multiple_loc(self.inv_transforms[inv_transform_key], y_hat[target], locations)
-                y_trans = transform_multiple_loc(self.inv_transforms[inv_transform_key], y[target], locations)
+                y_hat_trans = transform_multiple_loc(
+                    self.inv_transforms[inv_transform_key], y_hat[target], locations)
+                y_trans = transform_multiple_loc(
+                    self.inv_transforms[inv_transform_key], y[target], locations)
             for metric_name, value in metrics_by_data[target].items():
                 metric_function = value["function"]
                 metric_log = value["log"]
@@ -284,9 +281,9 @@ class LModule(LightningModule):
 
     def on_validation_epoch_end(self) -> None:
         if self.compute_csi:
-            Calculated_CSI = self.CSI[: len(CSI_THR)] / self.CSI[len(CSI_THR) :]
+            Calculated_CSI = self.CSI[: len(CSI_THR)] / self.CSI[len(CSI_THR):]
             Sumed_CSI = torch.sum(self.CSI, dim=1)
-            CSI_res = Sumed_CSI[: len(CSI_THR)] / Sumed_CSI[len(CSI_THR) :]
+            CSI_res = Sumed_CSI[: len(CSI_THR)] / Sumed_CSI[len(CSI_THR):]
             Average_CSI = torch.mean(Calculated_CSI, dim=0)
 
             for i, value in enumerate(CSI_THR):
@@ -349,18 +346,24 @@ class LModule(LightningModule):
                 y_hat_trans[key] = transformation[location](y_hat[key])
                 y_trans[key] = transformation[location](y_dict[key])
             else:
-                y_hat_trans[key] = transform_multiple_loc(transformation, y_hat[key], locations)
-                y_trans[key] = transform_multiple_loc(transformation, y_dict[key], locations)
+                y_hat_trans[key] = transform_multiple_loc(
+                    transformation, y_hat[key], locations)
+                y_trans[key] = transform_multiple_loc(
+                    transformation, y_dict[key], locations)
 
         if update_metrics:
             self.eval_metrics_agg.update(
-                target=y_trans[list(y_dict.keys())[0]][:, :, None].to(self.device),
-                pred=y_hat_trans[list(y_dict.keys())[0]][:, :, None].to(self.device),
+                target=y_trans[list(y_dict.keys())[0]][:,
+                                                       :, None].to(self.device),
+                pred=y_hat_trans[list(y_dict.keys())[0]][:,
+                                                         :, None].to(self.device),
                 metadata=None,
             )
             self.eval_metrics_lag.update(
-                target=y_trans[list(y_dict.keys())[0]][:, :, None].to(self.device),
-                pred=y_hat_trans[list(y_dict.keys())[0]][:, :, None].to(self.device),
+                target=y_trans[list(y_dict.keys())[0]][:,
+                                                       :, None].to(self.device),
+                pred=y_hat_trans[list(y_dict.keys())[0]][:,
+                                                         :, None].to(self.device),
                 metadata=metadata,
             )
 
@@ -384,7 +387,8 @@ class LModule(LightningModule):
                         values=grads,
                         global_step=self.trainer.global_step,
                     )
-                    change_rate = ((self.lr * grads).std() / w.data.std()).log10().item()
+                    change_rate = ((self.lr * grads).std() /
+                                   w.data.std()).log10().item()
                     self.logger.experiment.add_scalar(
                         tag=f"weights/grad:data-{name}",
                         scalar_value=change_rate,
@@ -396,7 +400,8 @@ class LModule(LightningModule):
         metadata = batch[3]
         locations = metadata["location"]
         n_locations = len(set(locations)) if isinstance(locations, list) else 1
-        y_hat = self.predict_step(batch, 0, update_metrics=False, return_full=True)
+        y_hat = self.predict_step(
+            batch, 0, update_metrics=False, return_full=True)
         for key in y_hat.keys():
             if key == "nowcastrio_autoenc":
                 continue
@@ -404,7 +409,8 @@ class LModule(LightningModule):
                 location = locations[0]
                 y_transf = self.inv_transforms[key][location](target[key])
             else:
-                y_transf = transform_multiple_loc(self.inv_transforms[key], target[key], locations)
+                y_transf = transform_multiple_loc(
+                    self.inv_transforms[key], target[key], locations)
 
             y_hat_key = y_hat[key]
             if self.crop_predict:
