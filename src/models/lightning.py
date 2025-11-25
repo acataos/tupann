@@ -240,7 +240,7 @@ class LModule(LightningModule):
         locations = metadata["location"]
         n_locations = len(set(locations)) if isinstance(locations, list) else 1
         y_hat = outputs
-        for target in y.keys():
+        for target in y_hat.keys():
             if target == "nowcastrio_autoenc":
                 y[target] = y[target][:, :-1]
             for key in self.inv_transforms.keys():
@@ -257,9 +257,11 @@ class LModule(LightningModule):
                 metric_function = value["function"]
                 metric_log = value["log"]
 
-                if self.crop_predict:
-                    y_trans = center_crop(y_trans)
-                    y_hat_trans = center_crop(y_hat_trans)
+                # if self.crop_predict:
+                #     y_trans = center_crop(y_trans)
+                #     y_hat_trans = center_crop(y_hat_trans)
+
+                # breakpoint()
 
                 computed_metric = metric_function(y_hat_trans, y_trans)
 
