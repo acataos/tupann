@@ -1,5 +1,5 @@
 import argparse
-import datetime
+from datetime import datetime, timedelta
 import pathlib
 
 import h5py
@@ -76,92 +76,86 @@ def warp(input, flow, grid, mode="bilinear", padding_mode="zeros", fill_value=0.
     return output
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="Save motion fields and intensities for a dataset and datetimes.")
-    parser.add_argument("--dataset", type=str,
-                        required=True, help="Dataset name")
-    parser.add_argument("--datetimes_file", type=str,
-                        required=True, help="List of datetimes")
-    parser.add_argument("--locations", nargs="+",
-                        help="Locations to process", default=["rio_de_janeiro"])
-    parser.add_argument("--overwrite", "-o",
-                        action="store_true", help="Overwrite existing files")
-    args = parser.parse_args()
-
+def main(datetimes: [datetime], dataset: str = "goes16_rrqpe", location: str = "rio_de_janeiro"):
     sample_tensor = torch.zeros(1, 1, 256, 256)
     grid = make_grid(sample_tensor)
-    dataset = args.dataset
-    datetimes_file = args.datetimes_file
-    # read datetimes from file
-    with open(datetimes_file, "r") as f:
-        datetimes = [datetime.datetime.strptime(
-            line.strip(), DT_FORMAT) for line in f.readlines()]
 
     dataset_handler = DatasetHandlerFactory.create_handler(
-        dataset, args.locations)
+        dataset, [location])
     for motion_field_method in motion_field_methods:
-        for location in args.locations:
-            fields_intensities_hdf_file = pathlib.Path(
-                f"data/fields_intensities/{motion_field_method}/{args.dataset}_{location}.hdf"
-            )
-            fields_intensities_hdf_file.parent.mkdir(
-                parents=True, exist_ok=True)
-            # check if file exists
-            with h5py.File(fields_intensities_hdf_file, "a") as hdf:
-                min_val = 0
-                for dt in tqdm(datetimes):
-                    dts = []
-                    try:
-                        _ = np.array(
-                            hdf[f"motion_fields/{dt.strftime('%Y%m%d/%H%M')}"])
-                        _ = np.array(
-                            hdf[f"intensities/{dt.strftime('%Y%m%d/%H%M')}"])
-                        continue
-                    except KeyError:
-                        pass
-                    for i in range(-CONTEXT_DICT[motion_field_method] + 1, 2):
-                        dts.append(dt + datetime.timedelta(minutes=i *
-                                   dataset_dict[dataset]["timestep"]))
-                    tensor = torch.tensor(dataset_handler.fetch(dts, location))
-                    print(tensor.max())
-                    tensor = torch.nan_to_num(tensor)
-                    tensor = tensor.float()
-                    # compute motion field
-                    motion_field = np.array(compute_motion_field(
-                        tensor, motion_field_method)).astype(np.float32)
-                    # compute intensities
-                    cuda_motion_field = torch.tensor(
-                        motion_field).float().unsqueeze(0).cuda()
-                    X0 = tensor[-2].unsqueeze(0).unsqueeze(0).cuda()
-                    X1 = tensor[-1].cuda()
-                    pred_image = warp(
-                        X0,
-                        cuda_motion_field,
-                        grid,
-                        padding_mode="zeros",
-                        fill_value=min_val,
-                    )
-                    intensities = X1 - pred_image
-                    intensities = intensities.cpu().numpy().astype(np.float32)
+        fields_intensities_hdf_file = pathlib.Path(
+            f"data/fields_intensities/{motion_field_method}/{dataset}_{location}.hdf"
+        )
+        fields_intensities_hdf_file.parent.mkdir(
+            parents=True, exist_ok=True)
+        # check if file exists
+        with h5py.File(fields_intensities_hdf_file, "a") as hdf:
+            min_val = 0
+            for dt in tqdm(datetimes):
+                dts = []
+                try:
+                    _ = np.array(
+                        hdf[f"motion_fields/{dt.strftime('%Y%m%d/%H%M')}"])
+                    _ = np.array(
+                        hdf[f"intensities/{dt.strftime('%Y%m%d/%H%M')}"])
+                    continue
+                except KeyError:
+                    pass
+                for i in range(-CONTEXT_DICT[motion_field_method] + 1, 2):
+                    dts.append(dt + timedelta(minutes=i *
+                               dataset_dict[dataset]["timestep"]))
+                tensor = torch.tensor(dataset_handler.fetch(dts, location))
+                print(tensor.max())
+                tensor = torch.nan_to_num(tensor)
+                tensor = tensor.float()
+                # compute motion field
+                motion_field = np.array(compute_motion_field(
+                    tensor, motion_field_method)).astype(np.float32)
+                # compute intensities
+                cuda_motion_field = torch.tensor(
+                    motion_field).float().unsqueeze(0).cuda()
+                X0 = tensor[-2].unsqueeze(0).unsqueeze(0).cuda()
+                X1 = tensor[-1].cuda()
+                pred_image = warp(
+                    X0,
+                    cuda_motion_field,
+                    grid,
+                    padding_mode="zeros",
+                    fill_value=min_val,
+                )
+                intensities = X1 - pred_image
+                intensities = intensities.cpu().numpy().astype(np.float32)
 
-                    # save both
-                    try:
-                        hdf.create_group("motion_fields")
-                        hdf.create_group("intensities")
-                    except ValueError:
-                        pass
-                    hdf.create_dataset(
-                        f"motion_fields/{dt.strftime('%Y%m%d/%H%M')}",
-                        data=motion_field,
-                        compression="lzf",
-                    )
-                    hdf.create_dataset(
-                        f"intensities/{dt.strftime('%Y%m%d/%H%M')}",
-                        data=intensities,
-                        compression="lzf",
-                    )
+                # save both
+                try:
+                    hdf.create_group("motion_fields")
+                    hdf.create_group("intensities")
+                except ValueError:
+                    pass
+                hdf.create_dataset(
+                    f"motion_fields/{dt.strftime('%Y%m%d/%H%M')}",
+                    data=motion_field,
+                    compression="lzf",
+                )
+                hdf.create_dataset(
+                    f"intensities/{dt.strftime('%Y%m%d/%H%M')}",
+                    data=intensities,
+                    compression="lzf",
+                )
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(
+        description="Save motion fields and intensities for a dataset and datetimes.")
+    parser.add_argument("--datetimes_file", type=str,
+                        required=True, help="List of datetimes")
+    parser.add_argument("--dataset", type=str,
+                        help="Dataset name", default="goes16_rrqpe")
+    parser.add_argument("--location", type="str",
+                        help="Location to process", default="rio_de_janeiro")
+    args = parser.parse_args()
+    with open(args.datetimes_file, "r") as f:
+        datetimes = [datetime.strptime(
+            line.strip(), DT_FORMAT) for line in f.readlines()]
+
+    main(**vars(args), datetimes=datetimes)
