@@ -126,7 +126,7 @@ def process_file(
 
 
 def process_satellite(
-    rain_events_file=None, product="ABI-L2-RRQPEF", location="rio_de_janeiro", num_workers=16
+    rain_events_file, product="ABI-L2-RRQPEF", location="rio_de_janeiro", num_workers=16
 ):
     # open yaml file with rain events information
     rain_events_name = Path(rain_events_file).stem
@@ -180,7 +180,8 @@ def process_satellite(
             )
         )
         dataframe.reset_index(drop=True, inplace=True)
-        output_path = Path(f"data/processed/satellite/{product}/{location}")
+        output_path = Path(
+            f"data/processed/satellite/{product}/{location}/{rain_events_name}")
         output_path.mkdir(exist_ok=True, parents=True)
         dataframe.to_feather(
             f"{output_path}/event_id={i:04d}.feather")

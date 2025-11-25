@@ -12,22 +12,31 @@ DT_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Save motion fields and intensities for a dataset and datetimes.")
-    parser.add_argument("--dataset", type=str, required=True, help="Dataset name")
-    parser.add_argument("--datetimes_file", type=str, required=True, help="List of datetimes")
-    parser.add_argument("--locations", nargs="+", help="Locations to process", default=["rj"])
-    parser.add_argument("--overwrite", "-o", action="store_true", help="Overwrite existing files")
-    parser.add_argument("--timestep_radius", "-tr", help="Radius of timesteps for each interval", type=int)
-    parser.add_argument("--threshold", "-thr", help="Threshold for rain", type=int)
+    parser = argparse.ArgumentParser(
+        description="Save motion fields and intensities for a dataset and datetimes.")
+    parser.add_argument("--dataset", type=str,
+                        required=True, help="Dataset name")
+    parser.add_argument("--datetimes_file", type=str,
+                        required=True, help="List of datetimes")
+    parser.add_argument("--locations", nargs="+",
+                        help="Locations to process", default=["rio_de_janeiro"])
+    parser.add_argument("--overwrite", "-o",
+                        action="store_true", help="Overwrite existing files")
+    parser.add_argument("--timestep_radius", "-tr",
+                        help="Radius of timesteps for each interval", type=int)
+    parser.add_argument("--threshold", "-thr",
+                        help="Threshold for rain", type=int)
     args = parser.parse_args()
 
     dataset = args.dataset
     datetimes_file = args.datetimes_file
     # read datetimes from file
     with open(datetimes_file, "r") as f:
-        datetimes = [datetime.datetime.strptime(line.strip(), DT_FORMAT) for line in f.readlines()]
+        datetimes = [datetime.datetime.strptime(
+            line.strip(), DT_FORMAT) for line in f.readlines()]
 
-    dataset_handler = DatasetHandlerFactory.create_handler(dataset, args.locations)
+    dataset_handler = DatasetHandlerFactory.create_handler(
+        dataset, args.locations)
     for location in args.locations:
         output_filepath = (
             f"data/rain_events/{args.dataset}-{location}-thr={args.threshold}-tr={args.timestep_radius}.yaml"
@@ -37,12 +46,16 @@ def main():
         bounds = []
         for dt in tqdm(datetimes):
             context = 3
-            dts = [dt + datetime.timedelta(minutes=i * 10) for i in range(-context, context + 1)]
-            tensor = torch.nan_to_num(torch.tensor(dataset_handler.fetch(dts, location)))
+            dts = [dt + datetime.timedelta(minutes=i * 10)
+                   for i in range(-context, context + 1)]
+            tensor = torch.nan_to_num(torch.tensor(
+                dataset_handler.fetch(dts, location)))
             if tensor.sum() < args.threshold:
                 continue
-            lower_bound = dt - args.timestep_radius * datetime.timedelta(minutes=10)
-            upper_bound = dt + args.timestep_radius * datetime.timedelta(minutes=10)
+            lower_bound = dt - args.timestep_radius * \
+                datetime.timedelta(minutes=10)
+            upper_bound = dt + args.timestep_radius * \
+                datetime.timedelta(minutes=10)
             if len(bounds):
                 if lower_bound <= bounds[-1][1] and upper_bound >= bounds[-1][0]:
                     lower_bound = min(lower_bound, bounds[-1][0])
