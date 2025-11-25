@@ -7,7 +7,7 @@ from src.models.lightning import LModule
 from src.models.nowcastrio.autoenc_parts.autoenc_utils import DiagonalGaussianDistribution
 from src.models.nowcastrio.autoenc_parts.modules import Decoder, Encoder
 from src.models.nowcastrio.utils import make_grid, warp
-from src.utils.lightning_utils import FIELDS_INTENSITIES_KEY_OPTIONS, transform_multiple_loc
+from src.utils.lightning_utils import  transform_multiple_loc
 
 # def wait():
 #     estructure_time = time.localtime()
@@ -58,7 +58,7 @@ class model(LModule):
         self.lambda_ = lanbda_
         self.predict_latent = predict_latent
         self.lead_time_cond = lead_time_cond
-        self.fields_intensities_key = None
+        self.fields_intensities_key = "fields_intensities" 
 
         self.g1 = torch.broadcast_to(
             torch.tensor([[1, 0, -1], [2, 0, -2], [1, 0, -1]], dtype=torch.float32), (1, 1, 3, 3)
@@ -253,17 +253,10 @@ class model(LModule):
 
     def training_step(self, batch, batch_idx):
         X, Y = batch[:2]
-        try:
-            motion_fields = Y[self.fields_intensities_key][:, :, :2].squeeze()
-            intensities = Y[self.fields_intensities_key][:, :, 2].squeeze()
-        except KeyError:
-            for option in FIELDS_INTENSITIES_KEY_OPTIONS:
-                if option in Y.keys():
-                    self.fields_intensities_key = option
-            if self.fields_intensities_key is None:
-                raise ValueError("No valid key for motion fields and intensities found in target dictionary.")
-            motion_fields = Y[self.fields_intensities_key][:, :, :2].squeeze()
-            intensities = Y[self.fields_intensities_key][:, :, 2].squeeze()
+
+        motion_fields = Y[self.fields_intensities_key][:, :, :2].squeeze()
+        intensities = Y[self.fields_intensities_key][:, :, 2].squeeze()
+
 
         assert len(X.keys()) == 1, "Expected a single key in the input batch."
         input = X[list(X.keys())[0]]
@@ -359,17 +352,10 @@ class model(LModule):
 
     def validation_step(self, batch, batch_idx):
         X, Y = batch[:2]
-        try:
-            motion_fields = Y[self.fields_intensities_key][:, :, :2].squeeze()
-            intensities = Y[self.fields_intensities_key][:, :, 2].squeeze()
-        except KeyError:
-            for option in FIELDS_INTENSITIES_KEY_OPTIONS:
-                if option in Y.keys():
-                    self.fields_intensities_key = option
-            if self.fields_intensities_key is None:
-                raise ValueError("No valid key for motion fields and intensities found in target dictionary.")
-            motion_fields = Y[self.fields_intensities_key][:, :, :2].squeeze()
-            intensities = Y[self.fields_intensities_key][:, :, 2].squeeze()
+
+        motion_fields = Y[self.fields_intensities_key][:, :, :2].squeeze()
+        intensities = Y[self.fields_intensities_key][:, :, 2].squeeze()
+
         metadata = batch[3]
         locations = metadata["location"]
 
@@ -434,11 +420,6 @@ class model(LModule):
             input, x_ini, transform=loc_transform, inv_transform=loc_inv_transform
         )
 
-        for option in FIELDS_INTENSITIES_KEY_OPTIONS:
-            if option in y_dict.keys():
-                self.fields_intensities_key = option
-        if self.fields_intensities_key is None:
-            self.fields_intensities_key = "fields_intensities"
         y_hat = {
             list(y_dict.keys())[1]: pred,
             self.fields_intensities_key: torch.cat([fields_hat, intensities_hat], dim=2),

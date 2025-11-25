@@ -38,9 +38,6 @@ class model(LModule):
         learning_rate: float = 0.0002,
         optim: str = "adam",
         lead_time_cond: int = 0,
-        cos_weight=0.33,
-        image_weight=0.5,
-        vector_weight: float = 0.1,
         maxvit_dim: int = 16,
         maxvit_depth: int = 4,
         loss: str = "l1",
@@ -52,7 +49,6 @@ class model(LModule):
         inv_transforms={},
         scheduler_params={"name": "exp", "params": {}},
         train_autoenc: bool = False,
-        latent_distribution: bool = False,
         **kwargs,
     ):
         true_target_dict = {list(target_shape_dict.keys())[0]: target_shape_dict[list(target_shape_dict.keys())[0]]}
@@ -66,6 +62,7 @@ class model(LModule):
             loss=loss,
             xmax=xmax,
             weights=weights,
+            learning_rate =learning_rate,
             lead_time_cond=lead_time_cond,
             **kwargs,
         )
@@ -124,8 +121,7 @@ class model(LModule):
             autoencoder.load_state_dict(
                 torch.load(autoencoder_path, map_location=self.device, weights_only=False), strict=True
             )
-        except Exception as e:
-            print(e, "... loaded state_dict")
+        except RuntimeError:
             autoencoder.load_state_dict(
                 torch.load(autoencoder_path, map_location=self.device, weights_only=False)["state_dict"], strict=True
             )
@@ -137,8 +133,8 @@ class model(LModule):
 
         self.reduc_factor = self.autoencoder.reduc_factor
 
-        channels_in = self.autoencoder.embed_dim * self.dim_factor
-        channels_out = self.autoencoder.embed_dim * self.dim_factor
+        channels_in = self.autoencoder.embed_dim
+        channels_out = self.autoencoder.embed_dim
 
         # Define latent model
         self.maxvitparams = {
@@ -226,7 +222,7 @@ class model(LModule):
 
             out[:, i] = future_image.squeeze()
 
-            return out
+        return out
 
     def compute_loss(self, image_pred, x_after, split="train"):
         train_loss_func = self.train_loss().to(self.device)
@@ -290,23 +286,22 @@ class model(LModule):
         return train_loss
 
     def configure_optimizers(self):
-        lr = self.hparams.learning_rate
         parameters = self.latent_model.parameters()
         optimizers = []
         schedulers = []
 
         if self.optim == "adam":
-            optimizer = torch.optim.Adam(parameters, lr=lr)
+            optimizer = torch.optim.Adam(parameters, lr=self.lr)
             if self.train_autoenc:
-                optimizer_autoenc = torch.optim.Adam(self.autoencoder.parameters(), lr=0.001 * lr)
+                optimizer_autoenc = torch.optim.Adam(self.autoencoder.parameters(), lr=0.001 * self.lr)
                 optimizers.append(optimizer_autoenc)
                 scheduler_autoenc = fetch_scheduler(self.scheduler_params)(optimizer_autoenc)
                 schedulers.append(scheduler_autoenc)
 
         elif self.optim == "adamw":
-            optimizer = torch.optim.AdamW(parameters, lr=lr)
+            optimizer = torch.optim.AdamW(parameters, lr=self.lr)
             if self.train_autoenc:
-                optimizer_autoenc = torch.optim.AdamW(self.autoencoder.parameters(), lr=0.001 * lr)
+                optimizer_autoenc = torch.optim.AdamW(self.autoencoder.parameters(), lr=0.001 * self.lr)
                 optimizers.append(optimizer_autoenc)
                 scheduler_autoenc = fetch_scheduler(self.scheduler_params)(optimizer_autoenc)
                 schedulers.append(scheduler_autoenc)
@@ -345,7 +340,7 @@ class model(LModule):
         pred = self.forward_lead_time_all(X, x_ini, transform=loc_transform, inv_transform=loc_inv_transform)
         _ = self.compute_loss(pred, Y, "val")
 
-        pred_dict = {list(Y_dict.keys())[0]: pred[0]}
+        pred_dict = {list(Y_dict.keys())[0]: pred}
 
         return pred_dict
 
@@ -385,7 +380,7 @@ class model(LModule):
 
         y_trans = {}
         y_hat_trans = {}
-        for key in y_dict.keys():
+        for key in y_hat.keys():
             transformation = self.inv_transforms[key]
             if n_locations == 1:
                 location = locations[0]

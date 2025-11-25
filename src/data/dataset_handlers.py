@@ -120,7 +120,7 @@ class GOES16Handler(DatasetHandler):
                     key = dt.strftime("%Y%m%d/%H%M")
                     if key in f:
                         data = f[key]
-                        results.append(data)
+                        results.append(np.array(data))
                     else:
                         self.logger.debug(f"Missing GOES-16 data for {key}")
                         results.append(
@@ -365,11 +365,11 @@ class FieldsIntensitiesHandler(DatasetHandler):
                 for key in keys:
                     try:
                         # Get intensities and add new axis
-                        intensities = np.squeeze(hdf["intensities"][key])
+                        intensities = np.squeeze(np.array(hdf["intensities"][key]))
                         intensities = intensities[np.newaxis, :, :]
 
                         # Get motion fields
-                        fields = hdf["motion_fields"][key]
+                        fields = np.array(hdf["motion_fields"][key])
 
                         # Concatenate along first axis
                         full_tensor = np.concatenate(

@@ -188,6 +188,8 @@ class GeneralDataset(Dataset):
             weights_filepath = pathlib.Path("data/weights/goes16_miami.npy")
         else:
             # breakpoint()
+            data_size = np.arange(len(self))
+            loc_index = np.sum(np.array(self.dt_len).reshape(-1, 1) <= data_size.reshape(1, -1), axis=0)
             for loc, dt_file in enumerate(self.datetimes_files):
                 weights_dict = {
                     "dataset_name": list(self.input.keys())[0],
@@ -197,8 +199,8 @@ class GeneralDataset(Dataset):
                 }
                 print(weights_dict)
                 weights_hash = calc_dict_hash(weights_dict)
-                if self.cropped_window is not None:
-                    weights_hash += f"_{self.cropped_window}"
+                # if self.cropped_window is not None:
+                #     weights_hash += f"_{self.cropped_window}"
                 weights_filepath = pathlib.Path(f"data/weights/{weights_hash}.npy")
                 print(weights_filepath)
                 if not overwrite_if_exists and weights_filepath.is_file():
@@ -208,9 +210,24 @@ class GeneralDataset(Dataset):
 
                     weights_list.append(weights)
                 else:
-                    raise FileNotFoundError(
-                        f"Weights file {weights_filepath} not found. Please set overwrite_if_exists=True to compute weights."
-                    )
+                    def task(i):
+                        X = self.__getitem__(i, calc_weights=True)
+                        X[X < 0] = 0
+                        assert torch.all(X >= -0.000001), "Input data must be positive for weight calculation."
+                        weight = torch.sum(1 - torch.exp(-torch.nan_to_num(X)))
+                        weight += MIN_WEIGHT
+                        return weight
+
+                    # cpu_count = os.cpu_count()
+                    # weights = Parallel(n_jobs=cpu_count)(delayed(task)(i) for i in tqdm.tqdm(range(len(self) // self.nlt)))
+                    idx = np.where(loc_index == loc)[0]
+                    weights = [task(i) for i in tqdm.tqdm(idx)]
+                    weights = np.array(weights)
+                    weights = weights / weights.sum()
+                    weights_filepath.parents[0].mkdir(parents=True, exist_ok=True)
+                    np.save(weights_filepath, weights)
+                    weights = np.tile(weights, (self.nlt, 1)).T.flatten()
+                    weights_list.append(weights)
             weights = np.concatenate(weights_list)
             # breakpoint()
             assert len(weights) == len(self)
@@ -220,8 +237,8 @@ class GeneralDataset(Dataset):
 
         def task(i):
             X = self.__getitem__(i, calc_weights=True)
-            if self.cropped_window is not None:
-                X = center_crop(X, self.cropped_window, self.cropped_window)
+            # if self.cropped_window is not None:
+            #     X = center_crop(X, self.cropped_window, self.cropped_window)
             X[X < 0] = 0
             assert torch.all(X >= -0.000001), "Input data must be positive for weight calculation."
             weight = torch.sum(1 - torch.exp(-torch.nan_to_num(X)))

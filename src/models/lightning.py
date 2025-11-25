@@ -83,12 +83,14 @@ class LModule(LightningModule):
         transforms={},
         inv_transforms={},
         crop_predict=False,
+        learning_rate: float = 1e-3,
         **kwargs,
     ):
         super().__init__()
 
         self.save_hyperparameters()
         self.transforms = transforms
+        self.lr = learning_rate
         self.inv_transforms = inv_transforms
         self.crop_predict = crop_predict
         # TODO: in latent space this assert is broken

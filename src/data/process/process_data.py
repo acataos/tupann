@@ -1,5 +1,5 @@
 from argparse import ArgumentParser
-from src.data.process.process_satellite import main as process_satellite
+from src.data.process.process_satellite import process_satellite
 from src.data.process.build_dataframe_from_sat import main as build_dataframe_from_sat
 from src.data.process.save_intensities_and_motion_hdf import main as save_intensities_and_motion_hdf
 from src.data.process.calc_rain_events_datetimes import main as calc_rain_events_datetimes
