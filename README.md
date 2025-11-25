@@ -37,5 +37,5 @@ sh download_goes16_rrqpe.sh configs/data/datetimes-goes16_rrqpe-rj.txt
 Once the data is successfully downloaded, you can process it by running
 
 ```bash
-python src/data/process/process_satellite.py data/rain_events/goes16_rrqpe-rj.yaml --location rio_de_janeiro
+python src/data/process/process_data.py data/rain_events/goes16_rrqpe-rj.yaml --location rio_de_janeiro
 ```
