@@ -4,6 +4,7 @@ import numpy as np
 import torch
 from matplotlib.colors import ListedColormap
 from moviepy.video.io.bindings import mplfig_to_npimage
+import warnings
 
 
 def compare_true_pred(X_true, X_pred, cmap, X_model=None, v_max=1, v_min=0):
@@ -66,13 +67,15 @@ def plot_fields_intensities(ax, arr):
     inds = np.random.choice(arr_size**2, 200, replace=False)
     inds_i = inds // arr_size
     inds_j = inds % arr_size
-    ax.quiver(
-        inds_i,
-        inds_j,
-        fields[0, inds_i, inds_j].cpu().detach(),
-        fields[1, inds_i, inds_j].cpu().detach(),
-        color="red",
-    )
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        ax.quiver(
+            inds_i,
+            inds_j,
+            fields[0, inds_i, inds_j].cpu().detach(),
+            fields[1, inds_i, inds_j].cpu().detach(),
+            color="red",
+        )
     rainbow = mlp.colormaps["rainbow"]
     # Create colormap for radar
     list_color = rainbow(np.linspace(0, 1, 256))
