@@ -375,30 +375,6 @@ class LModule(LightningModule):
             return y_hat_trans
         return y_hat_trans[list(y_dict.keys())[0]]
 
-    @torch.no_grad()
-    def on_after_backward(self):
-        with torch.no_grad():
-            if self.trainer.global_step % 1000 == 0:
-                params = self.named_parameters()
-                for p in params:
-                    name = p[0]
-                    w = p[1]
-                    grads = w.grad
-                    if grads is None:
-                        continue
-                    self.logger.experiment.add_histogram(
-                        tag=f"weights/grads-{name}",
-                        values=grads,
-                        global_step=self.trainer.global_step,
-                    )
-                    change_rate = ((self.lr * grads).std() /
-                                   w.data.std()).log10().item()
-                    self.logger.experiment.add_scalar(
-                        tag=f"weights/grad:data-{name}",
-                        scalar_value=change_rate,
-                        global_step=self.trainer.global_step,
-                    )
-
     def plot_preds(self, batch, split):
         _, target = batch[:2]
         metadata = batch[3]
