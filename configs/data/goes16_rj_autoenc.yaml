@@ -11,12 +11,12 @@ target:
 
 train:
   locations: ["rio_de_janeiro"]
-  datetimes: "configs/data/train_FI_datetimes-goes16_rrqpe-rj_small.txt"
+  datetimes: "configs/data/train_datetimes-goes16_rrqpe-rj-exclude_first=10-exclude_last=1.txt"
 
 val:
   locations: ["rio_de_janeiro"]
-  datetimes: "configs/data/val_FI_datetimes-goes16_rrqpe-rj_small.txt"
+  datetimes: "configs/data/val_datetimes-goes16_rrqpe-rj-exclude_first=10-exclude_last=1.txt"
 
 test:
   locations: ["rio_de_janeiro"]
-  datetimes: "configs/data/test_FI_datetimes-goes16_rrqpe-rj_small.txt"
+  datetimes: "configs/data/test_datetimes-goes16_rrqpe-rj-exclude_first=10-exclude_last=1.txt"
