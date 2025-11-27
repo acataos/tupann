@@ -1,8 +1,8 @@
 [tool.poetry]
-name = "impa-cast"
-version = "0.1.0"
+name = "tupann"
+version = "1.0.0"
 description = ""
-authors = ["acataos <acatao1999@gmail.com>"]
+authors = ["acataos <antonio.catao@impa.br>", "melvinpqbsc <melvin.poveda@impa.br>", "Lvoltarelli <leonardo.voltarelli@impa.br>", "paulo-o <pauloo@impa.br>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
