@@ -189,7 +189,7 @@ def process_satellite(
 
 if __name__ == "__main__":
     parser = ArgumentParser()
-    parser.add_argument("rain_events_file", type=str)
+    parser.add_argument("--rain_events_file", type=str, required=True)
     parser.add_argument("--product", type=str, default="ABI-L2-RRQPEF")
     parser.add_argument("--location", type=str, default="rio_de_janeiro")
     parser.add_argument("--num_workers", type=int, default=16)

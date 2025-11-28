@@ -92,7 +92,7 @@ def main(rain_events_file, product="ABI-L2-RRQPEF", location="rio_de_janeiro", n
                 event_to_dts[i].append(dt)
 
         for event_id, dts in tqdm(event_to_dts.items(), total=len(event_to_dts)):
-            df_file = f"{sat_folder}/event_id={i:04d}.feather"
+            df_file = f"{sat_folder}/event_id={event_id:04d}.feather"
             sd = SatelliteData.load_data(
                 df_file, product=product, value=value)
             sd.cast_to_float32()
@@ -154,7 +154,7 @@ def main(rain_events_file, product="ABI-L2-RRQPEF", location="rio_de_janeiro", n
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("rain_events_file", type=str,
+    parser.add_argument("--rain_events_file", type=str,
                         help="List of datetimes", required=True)
     parser.add_argument(
         "--product",
