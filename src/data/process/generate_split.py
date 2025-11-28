@@ -48,7 +48,7 @@ if __name__ == "__main__":
     file = pathlib.Path(args.yaml_file)
     split_dict = main(file, args.exclude_first, args.exclude_last)
     for split, datetimes in split_dict.items():
-        output_filepath = f"configs/data/{split}_datetimes-{file.stem}-exclude_first={args.exclude_first}-exclude_last={args.exclude_last}.txt"
+        output_filepath = f"configs/data/{split}_datetimes[{args.exclude_first}:-{args.exclude_last}]-{file.stem}.txt"
         with open(output_filepath, "w") as f:
             for dt in datetimes:
                 f.write(dt.strftime(DT_FORMAT) + "\n")

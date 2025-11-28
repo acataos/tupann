@@ -12,13 +12,13 @@ target:
 
 train:
   locations: ["rio_de_janeiro"]
-  datetimes: "configs/data/train_datetimes-goes16_rrqpe-rj_sample.txt"
+  datetimes: "configs/data/train_datetimes[10:-18]-goes16_rrqpe-rj.txt"
   leadtime_length: 2
 
 val:
   locations: ["rio_de_janeiro"]
-  datetimes: "configs/data/val_datetimes-goes16_rrqpe-rj_sample.txt"
+  datetimes: "configs/data/val_datetimes[10:-18]-goes16_rrqpe-rj.txt"
 
 test:
   locations: ["rio_de_janeiro"]
-  datetimes: "configs/data/test_datetimes-goes16_rrqpe-rj_sample.txt"
+  datetimes: "configs/data/test_datetimes[10:-18]-goes16_rrqpe-rj.txt"
