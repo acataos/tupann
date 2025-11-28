@@ -150,11 +150,11 @@ if __name__ == "__main__":
                         required=True, help="List of datetimes")
     parser.add_argument("--dataset", type=str,
                         help="Dataset name", default="goes16_rrqpe")
-    parser.add_argument("--location", type="str",
+    parser.add_argument("--location", type=str,
                         help="Location to process", default="rio_de_janeiro")
     args = parser.parse_args()
     with open(args.datetimes_file, "r") as f:
         datetimes = [datetime.strptime(
             line.strip(), DT_FORMAT) for line in f.readlines()]
 
-    main(**vars(args), datetimes=datetimes)
+    main(datetimes=datetimes, dataset=args.dataset, location=args.location)
