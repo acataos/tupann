@@ -1,0 +1,21 @@
+model_name: tupann_autoenc
+
+batch_size: 8
+n_epochs: 100
+
+learning_rate: 0.0001
+
+embed_dim: 6
+reduc_factor: 4
+channels: 64
+
+image_loss: True
+cos_weight: 0.33
+kl_weight: 0.00001
+vector_weight: 0.5
+future_image_loss: 0.5
+lambda_: 0.0002
+
+dropout: 0.0
+
+n_fields: 1
