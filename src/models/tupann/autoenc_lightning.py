@@ -35,6 +35,7 @@ class model(LModule):
         n_fields=1,
         lead_time_cond: int = 0,
         predict_latent: bool = False,
+        image_loss=False,
         **kwargs,
     ):
         true_target_dict = {list(target_shape_dict.keys())[
@@ -44,6 +45,7 @@ class model(LModule):
             true_target_dict,
             **kwargs,
         )
+        self.image_loss = image_loss
         self.automatic_optimization = False
         self.lr = learning_rate
         self.loss_weight = cos_weight
@@ -145,34 +147,57 @@ class model(LModule):
         reconstructions,
         posteriors,
         split="train",
+        y=None,
+        x=None,
+        transform=None,
+        inv_transform=None
     ):
         kl_loss = posteriors.kl()
         kl_loss = torch.sum(kl_loss) / kl_loss.shape[0]
 
         field_pred = reconstructions[:, :2].squeeze()
         intensity_pred = reconstructions[:, 2].squeeze()
-        l1_vector = torch.abs(motions_field_real - field_pred).mean()
-        cossim = -self.cos_loss(motions_field_real, field_pred).mean()
-        l1_intensities = torch.abs(intensities_real - intensity_pred).mean()
+        if self.image_loss:
 
-        rec_loss_vector = self.loss_weight * cossim + \
-            (1.0 - self.loss_weight) * l1_vector
-        rec_loss_intensities = l1_intensities
+            img_size = x.shape[-1]
+            sample_tensor = torch.zeros(1, 1, img_size, img_size)
+            grid = make_grid(sample_tensor, device=self.device)
+            grid = grid.repeat(y.shape[0], 1, 1, 1)
+            # extrapolate
+            current_image = y[:, :1]
+            future_image = warp(inv_transform(x), field_pred, grid, padding_mode="zeros", fill_value=0) + intensity_pred.unsqueeze(
+                1
+            )
+            # breakpoint()
+            loss = torch.nn.functional.l1_loss(current_image, transform(future_image))
+            log = {
+                "{}/total_loss".format(split): loss.detach().mean(),
+                "{}/kl_loss".format(split): kl_loss.detach().mean(),
+            }
 
-        loss = (
-            self.vector_weight * rec_loss_vector
-            + (1 - self.vector_weight) * rec_loss_intensities
-            + self.kl_weight * kl_loss
-        )
+        else:
+            l1_vector = torch.abs(motions_field_real - field_pred).mean()
+            cossim = -self.cos_loss(motions_field_real, field_pred).mean()
+            l1_intensities = torch.abs(intensities_real - intensity_pred).mean()
 
-        log = {
-            "{}/total_loss".format(split): loss.detach().mean(),
-            "{}/kl_loss".format(split): kl_loss.detach().mean(),
-            "{}/rec_loss_vector".format(split): rec_loss_vector.detach().mean(),
-            "{}/l1_vector".format(split): l1_vector.detach().mean(),
-            "{}/cossim".format(split): cossim.detach().mean(),
-            "{}/rec_loss_intensities".format(split): rec_loss_intensities.detach().mean(),
-        }
+            rec_loss_vector = self.loss_weight * cossim + \
+                (1.0 - self.loss_weight) * l1_vector
+            rec_loss_intensities = l1_intensities
+
+            loss = (
+                self.vector_weight * rec_loss_vector
+                + (1 - self.vector_weight) * rec_loss_intensities
+                + self.kl_weight * kl_loss
+            )
+
+            log = {
+                "{}/total_loss".format(split): loss.detach().mean(),
+                "{}/kl_loss".format(split): kl_loss.detach().mean(),
+                "{}/rec_loss_vector".format(split): rec_loss_vector.detach().mean(),
+                "{}/l1_vector".format(split): l1_vector.detach().mean(),
+                "{}/cossim".format(split): cossim.detach().mean(),
+                "{}/rec_loss_intensities".format(split): rec_loss_intensities.detach().mean(),
+            }
         return loss, log
 
     def loss_val(
@@ -219,6 +244,7 @@ class model(LModule):
 
         motion_fields = Y[self.fields_intensities_key][:, :, :2].squeeze()
         intensities = Y[self.fields_intensities_key][:, :, 2].squeeze()
+        y = Y["goes16_rrqpe"]
 
         assert len(X.keys()) == 1, "Expected a single key in the input batch."
         input = X[list(X.keys())[0]]
@@ -226,11 +252,26 @@ class model(LModule):
         opt_ae = self.optimizers()
         sch = self.lr_schedulers()
 
+        metadata = batch[3]
+        locations = metadata["location"]
+
+        def loc_transform(t):
+            return torch.cat(
+                [self.transforms[list(Y.keys())[1]][locations[i]](t[i]).unsqueeze(0) for i in range(t.shape[0])], dim=0
+            )
+
+        def loc_inv_transform(t):
+            return torch.cat(
+                [self.inv_transforms[list(Y.keys())[1]][locations[i]](
+                    t[i]).unsqueeze(0) for i in range(t.shape[0])],
+                dim=0,
+            )
+
 
         self.toggle_optimizer(opt_ae)
 
         aeloss, log_dict_ae = self.loss(
-            motion_fields, intensities, reconstructions, posterior, split="train"
+            motion_fields, intensities, reconstructions, posterior, split="train", x=input[:, -1:], y=y,transform = loc_transform, inv_transform = loc_inv_transform
         )
 
         self.log_dict(
