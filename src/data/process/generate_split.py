@@ -11,7 +11,7 @@ SPLIT_PROPORTION = [0.7, 0.85, 1]  # Train, Val, Test
 
 
 def main(yaml_file, exclude_first=0, exclude_last=0):
-    rain_events_list = yaml.safe_load(open(file))
+    rain_events_list = yaml.safe_load(open(yaml_file))
     random.seed(42)  # For reproducibility
     random.shuffle(rain_events_list)
 
