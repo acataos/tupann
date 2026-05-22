@@ -100,7 +100,7 @@ python src/models/predict.py \
     --fold test \
     --ckpt_file <checkpoint_file> \
     --devices 0 \
-    --save_prediction_options 1
+    --save_prediction_options 2
 ```
 
 where ``<checkpoint_file>`` is the name of a ``.ckpt`` file in the model output directory. Predictions are saved as HDF files under ``models/<model_hash>/predictions/``. Evaluation metrics (CSI and HSS across multiple rainfall thresholds and lead times) are saved as CSV files to ``eval/<model_hash>/<data_config>/``. To evaluate on the validation set instead, pass ``--fold val``.
