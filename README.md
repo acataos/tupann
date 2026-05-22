@@ -76,3 +76,42 @@ python src/data/process/generate_split.py \
 
 This produces ``configs/data/{split}_datetimes[10:-1]-goes16_rrqpe-rj.txt`` files for each of the three splits. The ``--exclude_first`` and ``--exclude_last`` arguments control how many timesteps are dropped from the start and end of each rain event to avoid boundary effects.
 
+### Training
+
+Training requires two stages: first the variational autoencoder, then the full TUPANN model. Both stages use the ``train.py`` script, which takes a data configuration, an evaluation configuration and a model hyperparameter configuration as arguments.
+
+To train the autoencoder, run:
+
+```bash
+python src/models/train.py \
+    --data_config goes16_rj_autoenc \
+    --eval_config goes16_eval_rio \
+    --hparams_config autoenc_tupann_image_loss
+```
+
+Checkpoint files are saved to ``models/tupann_autoenc/<model_hash>/train/<data_config>/``. Once training is complete, set ``autoenc_ckpt`` and ``autoenc_hash`` in ``configs/models/tupann_image_loss.yaml`` to the checkpoint filename and hash from that directory. Then train TUPANN by running:
+
+```bash
+python src/models/train.py \
+    --data_config goes16_tuppann_rj_rain_events_darts_paper \
+    --eval_config goes16_eval_rio \
+    --hparams_config tupann_image_loss
+```
+
+Training can be resumed from an existing checkpoint by passing ``--ckpt_file <filename>`` to ``train.py``, where ``<filename>`` is the name of a ``.ckpt`` file in the model output directory. Multiple GPU training is supported via the ``--devices`` argument.
+
+### Evaluation
+
+To run prediction and compute evaluation metrics on the test set, run:
+
+```bash
+python src/models/predict.py \
+    --data_config goes16_tuppann_rj_rain_events_darts_paper \
+    --hparams_config tupann_image_loss \
+    --fold test \
+    --ckpt_file <checkpoint_file> \
+    --devices 0 \
+    --save_prediction_options 1
+```
+
+where ``<checkpoint_file>`` is the name of a ``.ckpt`` file in the model output directory. Predictions are saved as HDF files under ``models/<model_hash>/predictions/``. Evaluation metrics (CSI and HSS across multiple rainfall thresholds and lead times) are saved as CSV files to ``eval/<model_hash>/<data_config>/``. To evaluate on the validation set instead, pass ``--fold val``.
