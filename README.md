@@ -41,7 +41,6 @@ export PYTHONPATH=$PWD
 
 ### Preparing the Data
 
-In order to prepare the data, first download the GOES-16 RRQPE dataset using the script ``download_goes16_rrqpe.sh``, which requires a file describing the datetimes to be downloaded. We provide a full list of datetimes for rain events in the city of Rio de Janeiro used in the paper in ``configs/data/datetimes-goes16_rrqpe-rj.txt``. A smaller sample is present in ``configs/data/datetimes-goes16_rrqpe-rj-sample.txt`` for testing purposes. To download the data, run:
 In order to prepare the data, first download the GOES-16 RRQPE dataset using the script ``download_goes16_rrqpe.sh``, which requires a file describing the datetimes to be downloaded. We provide a full list of datetimes for rain events in the city of Rio de Janeiro used in the paper in ``configs/data/datetimes-goes16_rrqpe-rj.txt``. A smaller sample is present in ``configs/data/datetimes-goes16_rrqpe-rj_sample.txt`` for testing purposes. To download the data, run:
 
 ```bash
@@ -53,16 +52,6 @@ Once the data is successfully downloaded, you can process it by running
 ```bash
 python src/data/process/process_data.py data/rain_events/goes16_rrqpe-rj.yaml --location rio_de_janeiro
 ```
-
-Both training stages require precomputed optical-flow motion fields and intensity residuals. Generate them by running:
-
-```bash
-python src/data/process/save_intensities_and_motion_hdf.py \
-    --datetimes_file configs/data/datetimes-goes16_rrqpe-rj.txt \
-    --location rio_de_janeiro
-```
-
-This writes fields to ``data/fields_intensities/darts/goes16_rrqpe_rio_de_janeiro.hdf`` and ``data/fields_intensities/lk/goes16_rrqpe_rio_de_janeiro.hdf``.
 
 ### Generating splits
 
