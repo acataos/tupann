@@ -29,7 +29,7 @@ class model(LModule):
         kl_weight=0.00001,
         vector_weight=0.5,
         future_image_loss=0.0,
-        lanbda_: float = 0.0,
+        lambda_: float = 0.0,
         channels=64,
         dropout=0.0,
         n_fields=1,
@@ -56,7 +56,7 @@ class model(LModule):
         self.embed_dim = embed_dim
         self.future_image_loss = future_image_loss
         self.n_fields = n_fields
-        self.lambda_ = lanbda_
+        self.lambda_ = lambda_
         self.predict_latent = predict_latent
         self.lead_time_cond = lead_time_cond
         self.fields_intensities_key = "fields_intensities"
