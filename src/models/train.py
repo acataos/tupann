@@ -219,7 +219,8 @@ def main(args):
         best_k_models_keys = checkpoint_save_best.best_k_models.keys()
         best_k_models_filenames = [k.split("/")[-1] for k in best_k_models_keys]
         best_k_model_vals = [checkpoint_save_best.best_k_models[k] for k in best_k_models_keys]
-        ckpt_filepath = pathlib.Path(f"{output_path}/{args.ckpt_file}")
+        if args.ckpt_file is not None:
+            ckpt_filepath = pathlib.Path(f"{output_path}/{args.ckpt_file}")
         ckpt_tree_filepath = pathlib.Path(output_path + "/ckpt_tree.jsonl")
 
         lock(ckpt_tree_filepath.with_suffix(".tmp"), logger)
@@ -228,7 +229,7 @@ def main(args):
                 ckpt_dict = {
                     "filename": filename,
                     "loss": value.detach().item(),
-                    "parent_ckpt": str(ckpt_filepath).split("/")[-1],
+                    "parent_ckpt": str(ckpt_filepath).split("/")[-1] if ckpt_filepath is not None else None,
                 }
                 yaml.dump(ckpt_dict, outfile)
                 outfile.write("\n")
