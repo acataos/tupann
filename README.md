@@ -42,6 +42,7 @@ export PYTHONPATH=$PWD
 ### Preparing the Data
 
 In order to prepare the data, first download the GOES-16 RRQPE dataset using the script ``download_goes16_rrqpe.sh``, which requires a file describing the datetimes to be downloaded. We provide a full list of datetimes for rain events in the city of Rio de Janeiro used in the paper in ``configs/data/datetimes-goes16_rrqpe-rj.txt``. A smaller sample is present in ``configs/data/datetimes-goes16_rrqpe-rj-sample.txt`` for testing purposes. To download the data, run:
+In order to prepare the data, first download the GOES-16 RRQPE dataset using the script ``download_goes16_rrqpe.sh``, which requires a file describing the datetimes to be downloaded. We provide a full list of datetimes for rain events in the city of Rio de Janeiro used in the paper in ``configs/data/datetimes-goes16_rrqpe-rj.txt``. A smaller sample is present in ``configs/data/datetimes-goes16_rrqpe-rj_sample.txt`` for testing purposes. To download the data, run:
 
 ```bash
 bash src/data/download_goes16_rrqpe.sh configs/data/datetimes-goes16_rrqpe-rj.txt
