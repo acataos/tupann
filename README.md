@@ -53,3 +53,26 @@ Once the data is successfully downloaded, you can process it by running
 ```bash
 python src/data/process/process_data.py data/rain_events/goes16_rrqpe-rj.yaml --location rio_de_janeiro
 ```
+
+Both training stages require precomputed optical-flow motion fields and intensity residuals. Generate them by running:
+
+```bash
+python src/data/process/save_intensities_and_motion_hdf.py \
+    --datetimes_file configs/data/datetimes-goes16_rrqpe-rj.txt \
+    --location rio_de_janeiro
+```
+
+This writes fields to ``data/fields_intensities/darts/goes16_rrqpe_rio_de_janeiro.hdf`` and ``data/fields_intensities/lk/goes16_rrqpe_rio_de_janeiro.hdf``.
+
+### Generating splits
+
+The provided datetime files in ``configs/data/`` already contain pre-computed train, validation and test splits for Rio de Janeiro. To generate splits for a different set of rain events, run:
+
+```bash
+python src/data/process/generate_split.py \
+    --yaml_file data/rain_events/goes16_rrqpe-rj.yaml \
+    --exclude_first 10 --exclude_last 1
+```
+
+This produces ``configs/data/{split}_datetimes[10:-1]-goes16_rrqpe-rj.txt`` files for each of the three splits. The ``--exclude_first`` and ``--exclude_last`` arguments control how many timesteps are dropped from the start and end of each rain event to avoid boundary effects.
+
