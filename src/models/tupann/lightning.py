@@ -335,7 +335,7 @@ class model(LModule):
         optimizers.append(optimizer)
         schedulers.append(scheduler)
 
-        return optimizers, scheduler
+        return optimizers, schedulers
 
     def validation_step(self, batch, batch_idx):
         X_dict, Y_dict = batch[:2]
