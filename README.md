@@ -19,10 +19,23 @@ cd tupann
 
 ### Installation
 
+TUPANN requires Python 3.10 or newer and a CUDA-capable GPU. Create and activate a virtual environment before installing:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+```
+
 Install the required libraries:
 
 ```bash
 pip install -r requirements.txt
+```
+
+Set the project root on the Python path so that all scripts can locate the ``src`` package:
+
+```bash
+export PYTHONPATH=$PWD
 ```
 
 
