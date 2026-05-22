@@ -1,4 +1,5 @@
 # Precipitation nowcasting of satellite data using physically-aligned neural networks
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20349104.svg)](https://doi.org/10.5281/zenodo.20349104)
 
 Transferable and Universal Physics-Aligned Nowcasting Network (TUPANN) is a satellite-only deep learning model for short-term precipitation nowcasting, designed to operate effectively in regions lacking dense weather-radar networks. It is trained on GOES-16 RRQPE and IMERG data and evaluated across diverse climates.
 
